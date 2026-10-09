@@ -311,6 +311,9 @@ document.querySelectorAll('.fixes button').forEach((btn) => btn.onclick = () => 
   document.querySelectorAll('.fixes button').forEach((x) => x.classList.toggle('on', x === btn))
   recompute(); applyAudio()
 })
+// the phone can stop the sound by itself (lock screen, media controls): keep the label true
+const syncPlay = () => { if (ctx && playing) playBtn.textContent = ctx.state === 'running' ? 'Pause' : 'Play' }
+setInterval(syncPlay, 500)
 playBtn.onclick = async () => {
   if (!playing) { await ctx.resume(); startAudio(); playBtn.textContent = 'Pause' }
   else if (ctx.state === 'running') { await ctx.suspend(); playBtn.textContent = 'Play' }

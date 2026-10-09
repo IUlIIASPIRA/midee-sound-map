@@ -116,6 +116,7 @@
     </div>
     <div class="row" id="steps">
       <button class="btn btn--ghost" id="back" disabled>←</button>
+      <button class="btn btn--ghost" id="pp" hidden aria-label="Pause">❚❚</button>
       <button class="btn btn--next" id="next" disabled>Loading…</button>
     </div>
     <div id="tools" hidden>
@@ -336,6 +337,8 @@ const STAGE0 = 'Build a midee track from nothing, one part at a time. Watch the 
 const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, and take it as an Ableton project.'
 async function goTo(n) {
   if (!playing) { await ctx.resume(); startAt = ctx.currentTime + 0.05; playing = true; PARTS.forEach(startPart) }
+  else if (ctx.state !== 'running') { userPaused = false; await ctx.resume() }
+  drawPlay()
   stage = Math.max(0, Math.min(PARTS.length, n))
   PARTS.forEach((p, i) => {
     const was = p.on; p.on = i < stage
@@ -410,10 +413,26 @@ keySel.onchange = async () => {
   } catch (e) { msg(`Could not change key: ${e.message}`) }
   busy = false
 }
-$('play').onclick = async () => {
-  if (ctx.state === 'running') { await ctx.suspend(); $('play').textContent = 'Play' }
-  else { await ctx.resume(); $('play').textContent = 'Pause' }
+// Play / pause. On a phone the sound also stops by itself: the lock screen,
+// another app, or the stop button in the browser's media controls. Then the
+// next tap anywhere starts it again, unless the person paused it here.
+let userPaused = false
+async function togglePlay() {
+  if (ctx.state === 'running') { userPaused = true; await ctx.suspend() }
+  else { userPaused = false; await ctx.resume() }
 }
+function drawPlay() {
+  const on = ctx.state === 'running'
+  $('play').textContent = on ? 'Pause' : 'Play'
+  $('pp').textContent = on ? '❚❚' : '▶'; $('pp').setAttribute('aria-label', on ? 'Pause' : 'Play')
+  $('pp').hidden = !playing
+}
+ctx.onstatechange = drawPlay
+$('play').onclick = togglePlay
+$('pp').onclick = togglePlay
+addEventListener('pointerdown', (e) => {
+  if (playing && !userPaused && ctx.state !== 'running' && !e.target.closest('#pp, #play')) ctx.resume()
+})
 $('get').onclick = () => {
   $('sheetMeta').textContent = `Amber, remixed · Techno · 128 BPM · ${KEYS[key - 1]} · ${PARTS.filter((p) => p.on).length} parts`
   $('sheetList').innerHTML = PARTS.filter((p) => p.on).map((p) => { const n = pretty(p.name, p.group); return `<li>${n.title} <small>${n.sub}</small></li>` }).join('')
