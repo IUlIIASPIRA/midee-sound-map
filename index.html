@@ -57,7 +57,7 @@
   .zones { position: fixed; right: 24px; bottom: 24px; display: flex; gap: 12px; align-items: flex-end; }
   .z { width: 84px; text-align: center; }
   .z__glass { position: relative; height: 170px; border: 1.5px solid rgba(255,255,255,.35); border-top: 0; border-radius: 0 0 14px 14px; background: rgba(0,0,0,.45); transition: border-color .3s; }
-  .z__fill { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column-reverse; border-radius: 0 0 12px 12px; overflow: hidden; transition: filter .4s; }
+  .z__fill { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column-reverse; border-radius: 0 0 12px 12px; overflow: hidden; transition: filter .4s; }
   .z__fill span { display: block; transition: height .12s linear; }
   .z__spill { position: absolute; left: -10px; right: -10px; bottom: 100%; height: 0; border-radius: 40% 40% 0 0 / 70% 70% 0 0; background: radial-gradient(ellipse at 50% 100%, rgba(124,111,94,.95), rgba(124,111,94,0) 70%); opacity: 0; transition: opacity .4s, height .4s; }
   .z--mud .z__glass { border-color: var(--mud); }
@@ -80,7 +80,7 @@
   @media (max-width: 900px) {
     .note { display: none; }
     .deck { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 52vh; padding: 12px; }
-    .zones { right: 10px; left: 10px; top: 40px; bottom: auto; justify-content: space-between; gap: 6px; }
+    .zones { right: 10px; left: 10px; top: 64px; bottom: auto; justify-content: space-between; gap: 6px; }
     .z { width: 22%; } .z__glass { height: 80px; } .z__s { display: none; }
   }
 </style>
@@ -442,7 +442,11 @@ const controls = new OrbitControls(camera, renderer.domElement)
 controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 10; controls.maxDistance = 46; controls.maxPolarAngle = 1.45
 function frameCamera() {
   const narrow = innerWidth < 900
-  camera.position.set(narrow ? 0 : 7, narrow ? 6 : 6.5, narrow ? 26 : 17); controls.target.set(narrow ? 0 : -3, 3.2, -6); controls.update()
+  camera.position.set(narrow ? 0 : 7, narrow ? 7.5 : 6.5, narrow ? 27 : 17); controls.target.set(narrow ? 0 : -3, narrow ? 2.2 : 3.2, -6); controls.update()
+  // On a phone the deck covers the lower half: draw the room higher up, into the free space.
+  if (narrow) camera.setViewOffset(innerWidth, innerHeight, 0, innerHeight * 0.2, innerWidth, innerHeight)
+  else camera.clearViewOffset()
+  camera.updateProjectionMatrix()
 }
 frameCamera()
 
