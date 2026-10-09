@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>midee · sound map · fill your track</title>
+<style>
+  @font-face { font-family: 'DM Sans'; src: url('fonts/dm-sans-regular-latin.woff2') format('woff2'); }
+  :root {
+    --mono: ui-monospace, 'SF Mono', Menlo, monospace; --dim: #8a8a93; --line: rgba(255,255,255,.12);
+    --kick: #fde047; --bassA: #a78bfa; --bassB: #f472b6; --mud: #7c6f5e; --ok: #5eead4;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: #e7e7ea; font-family: 'DM Sans', system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  button { font: inherit; color: inherit; }
+  .mono { font-family: var(--mono); letter-spacing: 1.2px; text-transform: uppercase; }
+
+  .hud { position: fixed; top: 22px; left: 26px; font: 12px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); pointer-events: none; }
+  .hud b { color: #e7e7ea; font-weight: 500; }
+
+  /* your track — the sounds */
+  .track { position: fixed; top: 58px; left: 26px; width: 300px; display: grid; gap: 8px; }
+  .track__h { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; margin-bottom: 2px; }
+  .snd { display: grid; grid-template-columns: 12px 1fr auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 6px; align-items: center;
+         padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); transition: border-color .2s, opacity .2s; }
+  .snd i { width: 10px; height: 10px; border-radius: 50%; }
+  .snd__n { font-size: 15px; }
+  .snd__n small { display: block; font: 10px/1.4 var(--mono); letter-spacing: 1px; color: var(--dim); text-transform: uppercase; }
+  .snd__b { font: 11px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; padding: 7px 10px; border-radius: 999px; border: 1px solid var(--line); background: none; cursor: pointer; }
+  .snd__b:hover { border-color: #fff; }
+  .snd__b--add { color: #000; background: var(--bassB); border-color: var(--bassB); }
+  .snd input { grid-column: 2 / 4; width: 100%; accent-color: #e7e7ea; }
+  .snd--off { opacity: .55; }
+  .snd--off input { visibility: hidden; height: 0; margin: 0; }
+  .snd--pulse { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { border-color: var(--bassB); box-shadow: 0 0 0 4px rgba(244,114,182,.15); } }
+  .play { margin-top: 4px; padding: 12px 14px; border-radius: 10px; border: 0; background: #e7e7ea; color: #000; font: 600 13px/1 var(--mono); letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; }
+  .play[disabled] { opacity: .5; cursor: default; }
+
+  /* the zones — four glasses */
+  .zones { position: fixed; right: 26px; bottom: 26px; display: flex; gap: 14px; align-items: flex-end; }
+  .z { width: 92px; text-align: center; }
+  .z__glass { position: relative; height: 200px; border: 1.5px solid rgba(255,255,255,.35); border-top: 0; border-radius: 0 0 14px 14px; overflow: visible; background: rgba(0,0,0,.45); transition: border-color .3s; }
+  .z__fill { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column-reverse; border-radius: 0 0 12px 12px; overflow: hidden; transition: filter .4s; }
+  .z__fill span { display: block; transition: height .12s linear, background .4s; }
+  .z__spill { position: absolute; left: -10px; right: -10px; bottom: 100%; height: 0; border-radius: 40% 40% 0 0 / 70% 70% 0 0; background: radial-gradient(ellipse at 50% 100%, rgba(124,111,94,.95), rgba(124,111,94,0) 70%); opacity: 0; transition: opacity .4s, height .4s; }
+  .z__drip { position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--mud); opacity: 0; }
+  .z--mud .z__glass { border-color: var(--mud); }
+  .z--mud .z__fill { filter: saturate(.25) blur(1.2px); }
+  .z--mud .z__spill { opacity: 1; height: 26px; }
+  .z--mud .z__drip { animation: drip 1.1s ease-in infinite; }
+  .z--mud .z__drip:nth-child(4) { animation-delay: .55s; }
+  @keyframes drip { 0% { opacity: .9; transform: translateY(0); } 100% { opacity: 0; transform: translateY(70px); } }
+  .z__t { font: 600 12px/1 var(--mono); letter-spacing: 1.5px; margin-top: 10px; }
+  .z__s { font-size: 12px; line-height: 1.3; color: var(--dim); margin-top: 4px; min-height: 32px; }
+  .z__s em { font-style: normal; color: #e7e7ea; }
+
+  /* the coach — what's happening and what to do */
+  .coach { position: fixed; left: 26px; bottom: 26px; width: min(440px, calc(100vw - 52px - 440px)); min-width: 300px;
+           padding: 16px 18px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0,0,0,.62); backdrop-filter: blur(8px); }
+  .coach__step { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; }
+  .coach__t { font-size: 19px; line-height: 1.3; margin: 8px 0 0; }
+  .coach--mud { border-color: var(--mud); }
+  .coach--ok { border-color: rgba(94,234,212,.45); }
+  .fixes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .fixes button { padding: 10px 12px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,.04); font-size: 14px; cursor: pointer; }
+  .fixes button:hover { border-color: #fff; }
+  .fixes button.on { background: #e7e7ea; color: #000; border-color: #e7e7ea; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .cta a { padding: 11px 14px; border-radius: 999px; text-decoration: none; font-size: 14px; }
+  .cta a:first-child { background: #c4b5fd; color: #000; }
+  .cta a:last-child { border: 1px solid var(--line); color: #e7e7ea; }
+
+  .note { position: fixed; left: 50%; top: 22px; transform: translateX(-50%); font: 10px/1 var(--mono); letter-spacing: 1px; color: #55555c; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 900px) {
+    .note { display: none; }
+    .track { top: 48px; left: 12px; right: 12px; width: auto; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .track__h { grid-column: 1 / -1; }
+    .snd { grid-template-columns: 10px 1fr; padding: 8px; }
+    .snd__b { grid-column: 1 / -1; }
+    .snd input { grid-column: 1 / -1; }
+    .snd__n { font-size: 13px; }
+    .play { grid-column: 1 / -1; }
+    .zones { left: 12px; right: 12px; bottom: auto; top: 46%; justify-content: space-between; gap: 6px; }
+    .z { width: 22%; }
+    .z__glass { height: 110px; }
+    .z__s { font-size: 11px; min-height: 0; }
+    .coach { left: 12px; right: 12px; bottom: 12px; width: auto; min-width: 0; padding: 12px 14px; }
+    .coach__t { font-size: 16px; }
+  }
+</style>
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/" } }
+</script>
+</head>
+<body>
+  <div class="hud">midee · <b>sound map</b> · fill your track</div>
+  <div class="note">real midee previews · drag to turn the room</div>
+
+  <div class="track" id="track">
+    <div class="track__h">Your track</div>
+    <!-- rows are filled in by the script -->
+  </div>
+
+  <div class="zones" id="zones"></div>
+
+  <div class="coach" id="coach">
+    <div class="coach__step" id="cstep">Step 1 of 3</div>
+    <p class="coach__t" id="ctext">Loading three midee sounds…</p>
+    <div class="fixes" id="fixes" hidden>
+      <button data-fix="cut">Cut the low end of Bass 2</button>
+      <button data-fix="down">Turn Bass 2 down</button>
+      <button data-fix="one">Keep one bass</button>
+    </div>
+    <div class="cta" id="cta" hidden>
+      <a href="https://midee.me/breakdowns#ep-03" target="_blank" rel="noopener">How White Rose builds its low end →</a>
+      <a href="https://midee.me/breakdowns#ep-03" target="_blank" rel="noopener">Get the Ableton project</a>
+    </div>
+  </div>
+
+<script type="module">
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/OrbitControls.js'
+
+// ================= the sounds =================
+const STATIC = 'https://midee.fra1.digitaloceanspaces.com/midee/tracks'
+const BPM = 128, STEP = 60 / BPM / 4            // one 16th
+const SOUNDS = [
+  { key: 'kick',  name: 'Amber Kick',        sub: 'midee · kick',      color: '#fde047', on: true,  gain: 1,
+    url: `${STATIC}/e29360f8-d212-4aca-ae63-6f9ea12d6644/ogg/128.ogg` },
+  { key: 'bassA', name: 'Deepeyes Bass Low', sub: 'midee · bass · Am', color: '#a78bfa', on: true,  gain: 1,
+    url: `${STATIC}/1c55510f-2842-448e-a4eb-980a34eb31c8/ogg/key-1/128.ogg` },
+  { key: 'bassB', name: 'Cosmic Bass Low',   sub: 'midee · bass · Am', color: '#f472b6', on: false, gain: 1,
+    url: `${STATIC}/cde14999-2e8d-4b1f-ae12-77cb775d5199/ogg/key-1/128.ogg` },
+]
+// Zones in plain words. The frequencies stay inside the code.
+const ZONES = [
+  { key: 'low',  t: 'LOW',  s: 'you feel it in the chest', lo: 30,   hi: 120,   target: -2,  speakers: 'subs' },
+  { key: 'body', t: 'BODY', s: 'the weight of the kick',   lo: 120,  hi: 600,   target: -6,  speakers: 'tops' },
+  { key: 'top',  t: 'TOP',  s: 'snap and click',           lo: 600,  hi: 6000,  target: -12, speakers: 'tops' },
+  { key: 'air',  t: 'AIR',  s: 'hats and shine',           lo: 6000, hi: 16000, target: -20, speakers: 'tops' },
+]
+const MUD = 0.17, CROWDED = 0.13                  // see the calibration at the top
+let cut = false                                   // Bass 2 high-passed
+
+// ---------- analysis: per 16th, 40 log bands, so a filter can be applied later ----------
+const N = 4096, NB = 40, F0 = 20, F1 = 20000
+const bandHz = Array.from({ length: NB }, (_, b) => F0 * Math.pow(F1 / F0, (b + 0.5) / NB))
+function fft(re, im) {
+  const n = re.length
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1
+    for (; j & bit; bit >>= 1) j ^= bit
+    j ^= bit
+    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]] }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const a = -2 * Math.PI / len, wr = Math.cos(a), wi = Math.sin(a)
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0
+      for (let k = 0; k < len / 2; k++) {
+        const ur = re[i + k], ui = im[i + k]
+        const vr = re[i + k + len / 2] * cr - im[i + k + len / 2] * ci
+        const vi = re[i + k + len / 2] * ci + im[i + k + len / 2] * cr
+        re[i + k] = ur + vr; im[i + k] = ui + vi
+        re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi
+        const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t
+      }
+    }
+  }
+}
+function analyse(buffer) {
+  const sr = buffer.sampleRate, ch = buffer.numberOfChannels
+  const x = new Float32Array(buffer.length)
+  for (let c = 0; c < ch; c++) { const d = buffer.getChannelData(c); for (let i = 0; i < x.length; i++) x[i] += d[i] / ch }
+  const hop = STEP * sr, steps = Math.floor(x.length / hop)
+  const win = Float32Array.from({ length: N }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)))
+  const binBand = new Int16Array(N / 2).map((_, k) => {
+    const f = k * sr / N
+    return f < F0 || f >= F1 ? -1 : Math.min(NB - 1, Math.floor(NB * Math.log(f / F0) / Math.log(F1 / F0)))
+  })
+  const out = []
+  const re = new Float32Array(N), im = new Float32Array(N)
+  for (let s = 0; s < steps; s++) {
+    const c = Math.round(s * hop)
+    for (let i = 0; i < N; i++) { re[i] = (x[c + i] || 0) * win[i]; im[i] = 0 }
+    fft(re, im)
+    const bands = new Float32Array(NB)
+    for (let k = 1; k < N / 2; k++) { const b = binBand[k]; if (b >= 0) bands[b] += re[k] * re[k] + im[k] * im[k] }
+    out.push(bands)
+  }
+  return out
+}
+// Energy of one sound per step and zone, with its current gain and filter.
+function zoneEnergy(snd) {
+  const g2 = snd.on ? snd.gain * snd.gain : 0
+  const hp = snd.key === 'bassB' && cut ? 180 : 0
+  const w = bandHz.map((f) => g2 / (hp ? 1 + Math.pow(hp / f, 4) : 1))   // 2nd-order high-pass, like the BiquadFilter
+  return snd.bands.map((bands) => ZONES.map((z) => {
+    let e = 0
+    for (let b = 0; b < NB; b++) if (bandHz[b] >= z.lo && bandHz[b] < z.hi) e += bands[b] * w[b]
+    return e
+  }))
+}
+let REF = 1                    // kick + one bass in the low zone = the reference "full"
+let state = null               // { E: [sound][step][zone], mix: [step][zone], clash: [zone], fill: [zone] }
+function recompute() {
+  const E = SOUNDS.map(zoneEnergy)
+  const steps = E[0].length
+  const mix = [], clash = [], fill = []
+  for (let t = 0; t < steps; t++) mix.push(ZONES.map((_, z) => E.reduce((a, e) => a + e[t][z], 0)))
+  ZONES.forEach((zone, z) => {
+    let tot = 0, second = 0
+    for (let t = 0; t < steps; t++) {
+      const v = E.map((e) => e[t][z]); const s = v.reduce((a, b) => a + b, 0)
+      tot += s; second += s - Math.max(...v)
+    }
+    clash.push(tot > 0 ? second / tot : 0)
+    const mean = tot / steps
+    const db = mean > 0 ? 10 * Math.log10(mean / REF) : -99
+    fill.push(Math.max(0, Math.min(1.25, 0.8 + (db - zone.target) / 22)))
+  })
+  state = { E, mix, clash, fill }
+  render()
+}
+
+// ================= audio =================
+let ctx, startAt = 0, playing = false
+const nodes = {}
+async function load() {
+  ctx = new (window.AudioContext || window.webkitAudioContext)()
+  await Promise.all(SOUNDS.map(async (s) => {
+    const res = await fetch(s.url)
+    if (!res.ok) throw new Error(`${s.name}: HTTP ${res.status}`)
+    try { s.buffer = await ctx.decodeAudioData(await res.arrayBuffer()) } catch {
+      // no OGG in this browser: the MP4 render, in the sound's own key (all three are in Am)
+      const mp4 = await fetch(s.url.replace(/\/ogg\/(key-\d+\/)?(\d+)\.ogg$/, '/render/$2.mp4'))
+      s.buffer = await ctx.decodeAudioData(await mp4.arrayBuffer())
+    }
+    s.bands = analyse(s.buffer)
+  }))
+  // reference: the low zone of kick + bass 1 at full gain
+  const k = zoneEnergy({ ...SOUNDS[0], on: true, gain: 1 }), a = zoneEnergy({ ...SOUNDS[1], on: true, gain: 1 })
+  REF = k.reduce((acc, _, t) => acc + k[t][0] + a[t][0], 0) / k.length
+}
+function startAudio() {
+  const master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination)
+  startAt = ctx.currentTime + 0.08
+  for (const s of SOUNDS) {
+    const src = ctx.createBufferSource(); src.buffer = s.buffer; src.loop = true
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 10; hp.Q.value = Math.SQRT1_2
+    const g = ctx.createGain(); g.gain.value = s.on ? s.gain : 0
+    src.connect(hp).connect(g).connect(master)
+    src.start(startAt)
+    nodes[s.key] = { g, hp }
+  }
+  playing = true
+}
+function applyAudio() {
+  if (!playing) return
+  const t = ctx.currentTime
+  for (const s of SOUNDS) nodes[s.key].g.gain.setTargetAtTime(s.on ? s.gain : 0, t, 0.03)
+  nodes.bassB.hp.frequency.setTargetAtTime(cut ? 180 : 10, t, 0.05)
+}
+const playStep = () => {
+  if (!playing || !state) return -1
+  const len = state.mix.length
+  return Math.floor(((ctx.currentTime - startAt) / STEP) % len + len) % len
+}
+
+// ================= UI =================
+const $ = (id) => document.getElementById(id)
+const track = $('track')
+for (const s of SOUNDS) {
+  const row = document.createElement('div'); row.className = 'snd'; row.id = `row-${s.key}`
+  row.innerHTML = `<i style="background:${s.color}"></i><div class="snd__n">${s.name}<small>${s.sub}</small></div>
+    <button class="snd__b"></button><input type="range" min="-18" max="0" step="1" value="0" aria-label="${s.name} volume">`
+  row.querySelector('button').onclick = () => { s.on = !s.on; if (s.key === 'bassB' && !s.on) cut = false; onChange() }
+  row.querySelector('input').oninput = (e) => { s.gain = Math.pow(10, e.target.value / 20); onChange() }
+  track.append(row); s.row = row
+}
+const playBtn = document.createElement('button'); playBtn.className = 'play'; playBtn.textContent = 'Loading…'; playBtn.disabled = true
+track.append(playBtn)
+
+const zonesEl = $('zones')
+for (const z of ZONES) {
+  const el = document.createElement('div'); el.className = 'z'
+  el.innerHTML = `<div class="z__glass"><div class="z__fill"></div><div class="z__spill"></div><div class="z__drip" style="left:18%;bottom:100%"></div><div class="z__drip" style="right:22%;bottom:100%"></div></div>
+    <div class="z__t">${z.t}</div><div class="z__s">${z.s}</div>`
+  zonesEl.append(el); z.el = el
+  z.segs = SOUNDS.map((s) => { const sp = document.createElement('span'); sp.style.background = s.color; el.querySelector('.z__fill').append(sp); return sp })
+}
+
+let step = 1, fixed = null
+function onChange() {
+  const b = SOUNDS[2]
+  if (b.on && step < 2) step = 2
+  recompute(); applyAudio()
+}
+document.querySelectorAll('.fixes button').forEach((btn) => btn.onclick = () => {
+  const b = SOUNDS[2], slider = b.row.querySelector('input')
+  const f = btn.dataset.fix
+  cut = f === 'cut'
+  if (f === 'down') { b.gain = Math.pow(10, -9 / 20); slider.value = -9 } else { b.gain = 1; slider.value = 0 }
+  b.on = f !== 'one'
+  fixed = f
+  document.querySelectorAll('.fixes button').forEach((x) => x.classList.toggle('on', x === btn))
+  recompute(); applyAudio()
+})
+playBtn.onclick = async () => {
+  if (!playing) { await ctx.resume(); startAudio(); playBtn.textContent = 'Pause' }
+  else if (ctx.state === 'running') { await ctx.suspend(); playBtn.textContent = 'Play' }
+  else { await ctx.resume(); playBtn.textContent = 'Pause' }
+}
+
+const mudLow = () => state && state.clash[0] >= MUD
+function render() {
+  if (!state) return
+  for (const s of SOUNDS) {
+    const btn = s.row.querySelector('button')
+    s.row.classList.toggle('snd--off', !s.on)
+    btn.textContent = s.on ? 'Remove' : '+ Add'
+    btn.classList.toggle('snd__b--add', !s.on && s.key === 'bassB')
+    s.row.classList.toggle('snd--pulse', s.key === 'bassB' && !s.on && playing && step === 1 && !fixed)
+  }
+  ZONES.forEach((z, i) => {
+    z.el.classList.toggle('z--mud', state.clash[i] >= MUD)
+    const sub = z.el.querySelector('.z__s')
+    sub.innerHTML = state.fill[i] < 0.12 ? `<em>empty</em> · hats and claps go here` : state.clash[i] >= MUD ? `<em>muddy</em> · two sounds at once` : z.s
+  })
+  const mud = mudLow(), crowded = state.clash[0] >= CROWDED && !mud
+  const coach = $('coach')
+  coach.classList.toggle('coach--mud', mud); coach.classList.toggle('coach--ok', !!fixed && !mud && !crowded)
+  $('fixes').hidden = !(mud || fixed)
+  $('cta').hidden = !(fixed && !mud && !crowded)
+  if (!playing) { $('cstep').textContent = 'Step 1 of 3'; $('ctext').textContent = 'Press play. A kick and one bass fill the low end, and the big speakers on the floor carry it.' }
+  else if (mud) { $('cstep').textContent = 'Step 2 of 3'; $('ctext').textContent = 'Two basses fight for the low end. The glass spills over, the subs smear, and the floor loses the groove. Try a fix.' }
+  else if (crowded) { $('cstep').textContent = 'Step 2 of 3'; $('ctext').textContent = 'Better, but the low end is still crowded. Turn Bass 2 down a bit more, or cut its low end.' }
+  else if (fixed) { $('cstep').textContent = 'Step 3 of 3'; $('ctext').textContent = fixed === 'cut'
+      ? 'Clean again. Bass 1 owns the low end, and Bass 2 keeps only its upper part. The floor locks in.'
+      : fixed === 'down' ? 'Cleaner. Bass 2 sits quietly under Bass 1, so one sound leads the low end.'
+      : 'Clean again. One bass owns the low end, and the floor locks in.' }
+  else if (SOUNDS[2].on) { $('cstep').textContent = 'Step 2 of 3'; $('ctext').textContent = 'Listen to the low end.' }
+  else { $('cstep').textContent = 'Step 1 of 3'; $('ctext').textContent = 'The low glass is full and clean. Top and air are still empty. Now add a second bass and watch the low end.' }
+}
+
+// The glasses move with the music: mostly the loop's average, plus the current 16th.
+function drawGlasses(st) {
+  if (!state) return
+  ZONES.forEach((z, i) => {
+    const live = st >= 0 ? state.mix[st][i] : 0
+    const avg = state.mix.reduce((a, m) => a + m[i], 0) / state.mix.length
+    const pulse = avg > 0 ? Math.min(1.6, live / avg) : 0
+    const level = Math.min(1.12, state.fill[i] * (0.82 + 0.18 * pulse))
+    const shares = SOUNDS.map((_, s) => state.E[s].reduce((a, e) => a + e[i], 0))
+    const sum = shares.reduce((a, b) => a + b, 0) || 1
+    z.segs.forEach((sp, s) => { sp.style.height = `${(level * 100 * shares[s] / sum).toFixed(1)}%` })
+  })
+}
+
+// ================= the room =================
+const renderer = new THREE.WebGLRenderer({ antialias: true })
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight); renderer.setClearColor(0x000000)
+document.body.prepend(renderer.domElement)
+const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x000000, 0.007)
+const camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.1, 400)
+const controls = new OrbitControls(camera, renderer.domElement)
+controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 12; controls.maxDistance = 46; controls.maxPolarAngle = 1.45
+function frameCamera() {
+  const narrow = innerWidth < 900
+  camera.position.set(narrow ? 0 : -6, narrow ? 7 : 8.5, narrow ? 30 : 21); controls.target.set(narrow ? 0 : 3, 2.6, -4); controls.update()
+}
+frameCamera()
+
+let seed = 11
+const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
+const between = (a, b) => a + (b - a) * rnd()
+const dot = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64
+  const g = c.getContext('2d'), grad = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+  grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.45, 'rgba(255,255,255,.85)'); grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c)
+})()
+const pmat = (size, opacity = 1) => new THREE.PointsMaterial({ size, map: dot, vertexColors: true, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending })
+function points(P, C, size, opacity) {
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3))
+  return new THREE.Points(geo, pmat(size, opacity))
+}
+const lineMat = (color, opacity) => new THREE.LineBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false })
+function lines(segs, color, opacity) {
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3))
+  return new THREE.LineSegments(geo, lineMat(color, opacity))
+}
+
+const W = 40, D = 26, H = 12, BOOTH_Z = -D / 2 + 3
+// the room: floor, walls with factory windows, columns, haze, roof, booth, the red laser
+{
+  const P = [], C = [], push = (x, y, z, b) => { P.push(x, y, z); C.push(b, b, b) }
+  for (let x = -W / 2; x <= W / 2; x += 0.42) for (let z = -D / 2; z <= D / 2; z += 0.42) push(x + between(-.12, .12), 0, z + between(-.12, .12), 0.13 + 0.2 * (1 - (z + D / 2) / D) * rnd())
+  for (const side of [-1, 1]) for (let z = -D / 2; z <= D / 2; z += 0.5) for (let y = 0; y <= H; y += 0.5) {
+    const win = Math.abs(((z + 50) % 4) - 2) < 1.4 && y > 3.5 && y < 9.5
+    if (rnd() < (win ? 0.55 : 0.22)) push(side * W / 2, y, z, win ? 0.28 : 0.1)
+  }
+  for (let x = -W / 2; x <= W / 2; x += 0.5) for (let y = 0; y <= H; y += 0.5) {
+    const win = Math.abs(((x + 50) % 4) - 2) < 1.4 && y > 3.5 && y < 9.5
+    if (rnd() < (win ? 0.5 : 0.18)) push(x, y, -D / 2, win ? 0.3 : 0.1)
+  }
+  for (const x of [-12, -4, 4, 12]) for (const z of [-2, 7]) for (let y = 0; y < H; y += 0.12) push(x + between(-.1, .1), y, z + between(-.1, .1), 0.3)
+  for (let i = 0; i < 4500; i++) push(between(-W / 2, W / 2), between(0, H), between(-D / 2, D / 2), 0.03)
+  scene.add(points(P, C, 0.17, 1))
+  const segs = []
+  for (let z = -D / 2; z <= D / 2; z += 3.25) {
+    segs.push(-W / 2, H, z, 0, H + 3, z, 0, H + 3, z, W / 2, H, z)
+    for (let x = -W / 2; x < W / 2; x += 2.5) segs.push(x, H + 3 * (1 - Math.abs(x) / (W / 2)), z, x + 2.5, H, z)
+  }
+  scene.add(lines(segs, 0xffffff, 0.14))
+  const booth = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(6, 1.2, 1.4)), lineMat(0xffffff, 0.5)); booth.position.set(0, 0.6, BOOTH_Z); scene.add(booth)
+  scene.add(lines([2.5, 2.4, BOOTH_Z + 0.5, 16, H + 1.5, -D / 2 + 1], 0xec4899, 0.8))
+}
+
+// the club system: subs on the floor, tops up high
+const SUBC = new THREE.Color('#a78bfa'), TOPC = new THREE.Color('#5eead4'), MUDC = new THREE.Color('#7c6f5e')
+const subs = [], tops = []
+for (const x of [-9, -6.6, 6.6, 9]) for (let k = 0; k < 2; k++) {
+  const geo = new THREE.BoxGeometry(1.8, 1, 1.2)
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), lineMat(SUBC, 0.9))
+  const glow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: SUBC.clone(), transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false }))
+  for (const m of [edge, glow]) { m.position.set(x, 0.5 + k, BOOTH_Z + 0.6); scene.add(m) }
+  subs.push({ edge, glow, x })
+}
+for (const [x, y, z] of [[-10.5, 7.2, BOOTH_Z + 1.2], [10.5, 7.2, BOOTH_Z + 1.2]]) for (let k = 0; k < 6; k++) {
+  const geo = new THREE.BoxGeometry(1.3, 0.38, 0.8)
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), lineMat(TOPC, 0.9))
+  const glow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: TOPC, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false }))
+  for (const m of [edge, glow]) { m.position.set(x, y - k * 0.4, z + k * 0.04); m.rotation.x = k * 0.06; scene.add(m) }
+  tops.push({ glow })
+}
+// the low end as a wave rolling out from the subs over the crowd
+const RINGS = 5, rings = []
+for (let i = 0; i < RINGS; i++) {
+  const seg = []; const r = 1
+  for (let a = 0; a < 64; a++) { const a0 = a / 64 * Math.PI, a1 = (a + 1) / 64 * Math.PI; seg.push(Math.cos(a0) * r, 0, Math.sin(a0) * r, Math.cos(a1) * r, 0, Math.sin(a1) * r) }
+  const l = lines(seg, SUBC, 0); l.position.set(0, 0.15, BOOTH_Z + 1); scene.add(l); rings.push(l)
+}
+
+// ---------- the crowd: dancers made of dots, a groove-techno bounce ----------
+// Down on every kick (knees), shoulders sway over two beats, head nods, elbows in.
+const dancers = [], DP = 34
+for (let i = 0; i < 170; i++) {
+  const z = BOOTH_Z + 3.2 + Math.pow(rnd(), 1.5) * (D - 7)
+  const x = between(-W / 2 + 4, W / 2 - 4) * (0.5 + 0.5 * (z - BOOTH_Z) / D)
+  dancers.push({ x, z, h: between(1.6, 1.92), phase: between(-0.06, 0.06), drift: between(0, 1), sway: between(0.6, 1.2), style: rnd() < 0.3 ? 1 : 0, b: 0.45 + 0.4 * rnd() })
+}
+// the body's dots in local space: [y as a share of height, x, z, part]
+const BODY = []
+for (let k = 0; k < 6; k++) { BODY.push([k / 6 * 0.46, -0.09, 0, 'leg'], [k / 6 * 0.46, 0.09, 0, 'leg']) }   // legs
+for (let k = 0; k < 8; k++) BODY.push([0.48 + k / 8 * 0.34, between(-0.13, 0.13), between(-0.06, 0.06), 'torso'])
+for (let k = 0; k < 6; k++) BODY.push([0.9 + between(-0.04, 0.04), between(-0.07, 0.07), between(-0.07, 0.07), 'head'])
+for (const s of [-1, 1]) BODY.push([0.78, s * 0.2, -0.02, 'arm'], [0.68, s * 0.22, -0.12, 'arm'], [0.72, s * 0.14, -0.22, 'hand'])
+const crowdGeo = new THREE.BufferGeometry()
+const cpos = new Float32Array(dancers.length * BODY.length * 3), ccol = new Float32Array(dancers.length * BODY.length * 3)
+dancers.forEach((d, i) => BODY.forEach((_, j) => { const o = (i * BODY.length + j) * 3; ccol[o] = ccol[o + 1] = ccol[o + 2] = d.b }))
+crowdGeo.setAttribute('position', new THREE.BufferAttribute(cpos, 3)); crowdGeo.setAttribute('color', new THREE.BufferAttribute(ccol, 3))
+scene.add(new THREE.Points(crowdGeo, pmat(0.2, 0.95)))
+
+let groove = 0.35, sync = 1, mudVis = 0
+function danceCrowd(beat) {
+  let o = 0
+  for (const d of dancers) {
+    const ph = beat + d.phase + (1 - sync) * (d.drift - 0.5) * 0.8
+    const bounce = groove * 0.11 * (0.5 + 0.5 * Math.cos(2 * Math.PI * ph))           // lowest on the beat
+    const sway = groove * 0.07 * d.sway * Math.sin(Math.PI * ph)                        // left on 1, right on 2
+    const nod = groove * 0.05 * Math.max(0, Math.cos(2 * Math.PI * ph))
+    const step = d.style ? groove * 0.05 * Math.sin(Math.PI * ph * 0.5) : 0
+    for (const [fy, lx, lz, part] of BODY) {
+      let y = fy * d.h, x = lx, z = lz
+      if (part === 'leg') y *= 1 - bounce / (0.46 * d.h)
+      else { y -= bounce; x += sway * (fy / 0.9) }
+      if (part === 'head') { y -= nod; z -= nod * 0.6 }
+      if (part === 'hand') { y += groove * 0.06 * Math.sin(2 * Math.PI * ph + 1); x *= 1 + 0.3 * groove * Math.sin(Math.PI * ph) }
+      cpos[o++] = d.x + x + step; cpos[o++] = y; cpos[o++] = d.z + z
+    }
+  }
+  crowdGeo.attributes.position.needsUpdate = true
+}
+
+// ================= the loop =================
+const clock = new THREE.Clock()
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05), now = clock.elapsedTime
+  const st = playStep()
+  const running = playing && ctx.state === 'running'
+  const beat = running ? (ctx.currentTime - startAt) * BPM / 60 : now * 0.6
+  const mud = mudLow()
+  // how the floor feels: grooving when clean, half-hearted and out of step when muddy
+  const wantGroove = running ? (mud ? 0.5 : 1) : 0.25
+  groove += (wantGroove - groove) * Math.min(1, dt * 2.5)
+  sync += ((mud ? 0.35 : 1) - sync) * Math.min(1, dt * 1.5)
+  mudVis += ((mud ? 1 : 0) - mudVis) * Math.min(1, dt * 2)
+  danceCrowd(beat)
+
+  if (state) {
+    const low = st >= 0 ? state.mix[st][0] / REF : 0
+    const hi = st >= 0 ? (state.mix[st][1] + state.mix[st][2] + state.mix[st][3]) / REF : 0
+    const subCol = SUBC.clone().lerp(MUDC, mudVis)
+    for (const s of subs) {
+      s.glow.material.color.copy(subCol); s.edge.material.color.copy(subCol)
+      s.glow.material.opacity = 0.08 + 0.5 * Math.min(1, low)
+      const jitter = mudVis * 0.05 * Math.sin(now * 37 + s.x)
+      s.glow.scale.setScalar(1 + 0.05 * Math.min(1, low) + jitter)
+    }
+    for (const t of tops) t.glow.material.opacity = 0.06 + 0.9 * Math.min(1, hi * 2)
+    // the low-end wave: rings leave the subs on the beat; muddy = thick and blurred
+    rings.forEach((r, i) => {
+      const age = ((beat + i / RINGS * 0) % 1 + i) / RINGS
+      const radius = 2 + age * 22
+      r.scale.set(radius, 1, radius)
+      r.material.color.copy(subCol)
+      r.material.opacity = running ? (1 - age) * (0.25 + 0.45 * Math.min(1, low)) * (1 + mudVis * 0.6) : 0
+      r.position.y = 0.15 + mudVis * 0.25 * Math.sin(now * 9 + i)
+    })
+    drawGlasses(running ? st : -1)
+  }
+  controls.update(); renderer.render(scene, camera); requestAnimationFrame(tick)
+}
+tick()
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); frameCamera() })
+
+load().then(() => {
+  recompute(); playBtn.disabled = false; playBtn.textContent = 'Play'
+}).catch((e) => {
+  playBtn.textContent = 'Could not load'
+  $('ctext').textContent = `The midee sounds did not load (${e.message}).`
+})
+// keep the coach in step with the music
+setInterval(render, 400)
+</script>
+</body>
+</html>

@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>midee · sound map · Amber in the club</title>
+<style>
+  @font-face { font-family: 'DM Sans'; src: url('fonts/dm-sans-regular-latin.woff2') format('woff2'); }
+  :root { --mono: ui-monospace, 'SF Mono', Menlo, monospace; --dim: #8a8a93; --line: rgba(255,255,255,.12); --mud: #7c6f5e; --laser: #ec4899; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: #e7e7ea; font-family: 'DM Sans', system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  button, select { font: inherit; color: inherit; }
+  .hud { position: fixed; top: 20px; left: 24px; font: 12px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); pointer-events: none; }
+  .hud b { color: #e7e7ea; font-weight: 500; }
+
+  /* the track: header, parts, buttons */
+  .deck { position: fixed; top: 48px; left: 24px; width: 330px; max-height: calc(100vh - 72px); overflow: auto; padding: 14px; border-radius: 12px;
+          border: 1px solid var(--line); background: rgba(0,0,0,.6); backdrop-filter: blur(8px); }
+  .deck__tag { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: #000; background: #fde047; display: inline-block; padding: 5px 7px; }
+  .deck__t { font: 600 22px/1.1 var(--mono); letter-spacing: 2px; margin: 10px 0 6px; }
+  .deck__meta { display: flex; gap: 8px; align-items: center; font: 12px/1 var(--mono); letter-spacing: 1px; color: var(--dim); text-transform: uppercase; }
+  .deck__meta select { background: #111; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font: 12px/1 var(--mono); color: #e7e7ea; }
+  .parts { display: grid; gap: 4px; margin: 14px 0 12px; }
+  .part { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 6px 6px 8px; border-radius: 8px; transition: background .15s, opacity .2s; }
+  .part:hover { background: rgba(255,255,255,.04); }
+  .part i { width: 8px; height: 22px; border-radius: 3px; transition: opacity .08s; }
+  .part__n { font-size: 14px; line-height: 1.2; overflow: hidden; }
+  .part__n small { display: block; font: 10px/1.4 var(--mono); letter-spacing: .8px; color: var(--dim); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .part button { width: 32px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: none; cursor: pointer; font-size: 14px; line-height: 1; }
+  .part button:hover { border-color: #fff; }
+  .part--off { opacity: .4; }
+  .part--new { animation: flash 1.2s ease-out; }
+  @keyframes flash { 0% { background: rgba(253,224,71,.25); } 100% { background: transparent; } }
+  .row { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 12px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.05); cursor: pointer; font: 600 12px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; }
+  .btn:hover { border-color: #fff; }
+  .btn--play { background: #e7e7ea; color: #000; border-color: #e7e7ea; }
+  .btn--get { background: #c4b5fd; color: #000; border-color: #c4b5fd; margin-top: 8px; width: 100%; }
+  .btn[disabled] { opacity: .5; cursor: default; }
+  .coach { margin: 2px 0 12px; padding: 12px 12px 12px 14px; border-left: 3px solid #fde047; background: rgba(253,224,71,.06); border-radius: 0 10px 10px 0; }
+  .coach__step { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; }
+  .coach__t { font-size: 15px; line-height: 1.4; margin: 6px 0 0; }
+  .coach__t b { color: #fde047; font-weight: 500; }
+  .part--next { opacity: .3; border: 1px dashed var(--line); }
+  .part--next button { visibility: hidden; }
+  .btn--next { background: #fde047; color: #000; border-color: #fde047; }
+  .btn--ghost { flex: 0 0 auto; padding: 12px 12px; }
+  .link { background: none; border: 0; padding: 0; margin-top: 10px; color: var(--dim); font: 11px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; cursor: pointer; text-decoration: underline; }
+  .z--focus .z__glass { border-color: #fde047; box-shadow: 0 0 0 3px rgba(253,224,71,.18); }
+  .z--focus .z__t { color: #fde047; }
+  .msg { font-size: 13px; line-height: 1.4; color: var(--dim); margin-top: 10px; min-height: 18px; }
+  .msg--mud { color: #e7d8c3; }
+
+  /* the zones */
+  .zones { position: fixed; right: 24px; bottom: 24px; display: flex; gap: 12px; align-items: flex-end; }
+  .z { width: 84px; text-align: center; }
+  .z__glass { position: relative; height: 170px; border: 1.5px solid rgba(255,255,255,.35); border-top: 0; border-radius: 0 0 14px 14px; background: rgba(0,0,0,.45); transition: border-color .3s; }
+  .z__fill { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column-reverse; border-radius: 0 0 12px 12px; overflow: hidden; transition: filter .4s; }
+  .z__fill span { display: block; transition: height .12s linear; }
+  .z__spill { position: absolute; left: -10px; right: -10px; bottom: 100%; height: 0; border-radius: 40% 40% 0 0 / 70% 70% 0 0; background: radial-gradient(ellipse at 50% 100%, rgba(124,111,94,.95), rgba(124,111,94,0) 70%); opacity: 0; transition: opacity .4s, height .4s; }
+  .z--mud .z__glass { border-color: var(--mud); }
+  .z--mud .z__fill { filter: saturate(.25) blur(1.2px); }
+  .z--mud .z__spill { opacity: 1; height: 24px; }
+  .z__t { font: 600 12px/1 var(--mono); letter-spacing: 1.5px; margin-top: 10px; }
+  .z__s { font-size: 12px; line-height: 1.3; color: var(--dim); margin-top: 4px; min-height: 32px; }
+  .z__s em { font-style: normal; color: #e7e7ea; }
+
+  /* the Ableton project sheet */
+  .sheet { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); }
+  .sheet__box { width: min(460px, calc(100vw - 32px)); padding: 22px; border-radius: 14px; border: 1px solid var(--line); background: #0b0b0d; }
+  .sheet__h { font: 600 18px/1.25 var(--mono); letter-spacing: 1px; margin: 0 0 6px; }
+  .sheet p { color: var(--dim); font-size: 14px; line-height: 1.45; margin: 8px 0; }
+  .sheet ol { margin: 12px 0; padding-left: 22px; font-size: 14px; line-height: 1.6; }
+  .sheet ol small { color: var(--dim); font-family: var(--mono); font-size: 11px; }
+  .note { position: fixed; left: 50%; top: 20px; transform: translateX(-50%); font: 10px/1 var(--mono); letter-spacing: 1px; color: #55555c; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 900px) {
+    .note { display: none; }
+    .deck { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 52vh; padding: 12px; }
+    .zones { right: 10px; left: 10px; top: 40px; bottom: auto; justify-content: space-between; gap: 6px; }
+    .z { width: 22%; } .z__glass { height: 80px; } .z__s { display: none; }
+  }
+</style>
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/" } }
+</script>
+</head>
+<body>
+  <div class="hud">midee · <b>sound map</b> · in the club</div>
+  <div class="note">real midee previews · drag to turn the room</div>
+
+  <div class="deck">
+    <span class="deck__tag">midee composition</span>
+    <div class="deck__t">AMBER</div>
+    <div class="deck__meta">Techno · 128 BPM · key
+      <select id="key" aria-label="Key"></select>
+    </div>
+    <div class="parts" id="parts"></div>
+    <div class="coach">
+      <div class="coach__step" id="cstep">Build a track · step 0 of 10</div>
+      <p class="coach__t" id="ctext">Loading the ten parts of Amber…</p>
+    </div>
+    <div class="row" id="steps">
+      <button class="btn btn--ghost" id="back" disabled>←</button>
+      <button class="btn btn--next" id="next" disabled>Loading…</button>
+    </div>
+    <div id="tools" hidden>
+      <div class="row">
+        <button class="btn btn--play" id="play">Pause</button>
+        <button class="btn" id="random">🎲 Random</button>
+      </div>
+      <button class="btn btn--get" id="get">Get the Ableton project</button>
+    </div>
+    <button class="link" id="skip">Skip to the full track</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div class="zones" id="zones"></div>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet__box">
+      <div class="sheet__h">Your Ableton project</div>
+      <p id="sheetMeta"></p>
+      <ol id="sheetList"></ol>
+      <p>Every part lands on its own track as MIDI with its Ableton Rack, so you can change the notes and every knob.</p>
+      <p><b style="color:#e7e7ea">Concept frame.</b> The site already builds Ableton projects from a set of sounds. Downloading this exact set from this page is the next step to build.</p>
+      <div class="row"><button class="btn" id="sheetClose">Close</button></div>
+    </div>
+  </div>
+
+<script type="module">
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/OrbitControls.js'
+
+// ================= the composition =================
+const STATIC = 'https://midee.fra1.digitaloceanspaces.com/midee/tracks'
+const BPM = 128, STEP = 60 / BPM / 4
+const KEYS = ['Am', 'A#m', 'Bm', 'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m']   // key-N, N = index + 1
+let key = 3                                                                                  // Amber is in B minor
+const GROUPS = {
+  Kick: '8c57ee55-34c4-4093-835f-315f621770a0', Drums: '3d0190c2-ae23-4862-8258-315aa759843e',
+  Percussion: 'afffabd2-7bf8-468c-9f8e-8ef8d7c0e345', Bass: 'f72cd6bd-0c6e-426c-864c-93d98c9e292b',
+  Synth: 'b00cea78-0360-4861-9e38-25e76e6db947', FX: '7bd31d33-77d2-402c-80b6-cbe5930597b2', Vocal: '6b68e16b-7da4-4877-89b8-5112b5705a7a',
+}
+const COLORS = { Kick: '#fde047', Drums: '#fb923c', Percussion: '#f97316', Bass: '#a78bfa', Synth: '#5eead4', FX: '#94a3b8', Vocal: '#f472b6' }
+const PARTS = [
+  ['e29360f8-d212-4aca-ae63-6f9ea12d6644', 'Amber_Kick_128_Simpler', 'Kick', false],
+  ['b928f475-e439-4794-bad9-cb8e044f9e1a', 'Amber_Bass_Low_Bm_128_Wavetable', 'Bass', true],
+  ['c5faab66-72c7-4cc2-95ca-4588df32f048', 'Amber_Bass_Acid_Bm_128_Analog', 'Bass', true],
+  ['21af9007-f47c-4158-b8f1-1a7eb3fd3e9e', 'Amber_Drums_Snare_Hats_Ride_128_Drum_Rack', 'Drums', false],
+  ['bcfca28c-d677-4a5b-a023-f67796209d16', 'Amber_Perc_128_Drum_Rack', 'Percussion', false],
+  ['c70a2a1c-8997-4020-8a4f-537a4d08c036', 'Amber_Synth_Chords_Bm_128_Wavetable', 'Synth', true],
+  ['59724fd3-ee3c-4815-8649-b6944393cfad', 'Amber_Synth_Pluck_Bm_128_Analog', 'Synth', true],
+  ['85549f24-1a91-4c22-b550-917fbb298210', 'Amber_Synth_Lead_Acid_Bm_128_Analog', 'Synth', true],
+  ['9e74c9b6-c332-46cf-91d6-5fdd7a78c580', 'Amber_FX_Glitch_128_Analog', 'FX', false],
+  ['be26f11e-4a98-4c8a-9742-fa64c75d96f4', 'Amber_Vox_128_Drum_Rack', 'Vocal', false],
+].map(([id, name, group, tonal]) => ({ id, name, group, tonal, on: false }))
+
+// The build, one part at a time. zone = the glass to look at. Claims checked
+// on these previews 10.10: the low bass leaves a short gap under each kick;
+// the acid bass sits mostly in BODY; the hats land on the off-beats in AIR.
+const LESSONS = [
+  { add: 'Start with the kick', zone: 0, text: 'Every techno track starts here. The kick fills <b>LOW</b> and gives the floor its pulse. Everything else is built around it.' },
+  { add: 'Add the low bass', zone: 0, text: 'The low bass joins the kick in <b>LOW</b>. It leaves a short gap under each kick, so the two take turns and the glass stays clean.' },
+  { add: 'Add a second bass', zone: 1, text: 'Two basses can work together when the second one lives higher. This acid line sits mostly in <b>BODY</b>, above the low bass, so LOW stays clean.' },
+  { add: 'Add the drums', zone: 3, text: 'Snare, hats and ride. The hats land between the kicks and open up <b>AIR</b>. Without them the track feels closed.' },
+  { add: 'Add percussion', zone: 1, text: 'Percussion fills the gaps in the groove. Listen to how the floor starts to move more.' },
+  { add: 'Add the chords', zone: 2, text: 'Chords give <b>TOP</b> its colour and set the mood. They are in the same key as the basses.' },
+  { add: 'Add the pluck', zone: 2, text: 'A pluck answers the chords in <b>TOP</b>. Short notes leave room for everything else.' },
+  { add: 'Add the lead', zone: 2, text: 'The lead is the hook people remember. It sits in <b>BODY</b> and <b>TOP</b>, over the chords.' },
+  { add: 'Add the FX', zone: 2, text: 'FX are quiet, and they glue the parts together and mark the changes.' },
+  { add: 'Add the vocal', zone: 1, text: 'A vocal shot adds a human touch on top of the groove.' },
+]
+let stage = 0
+
+// "Amber_Synth_Chords_Bm_128_Wavetable" → "Synth Chords", "by Amber · Wavetable"
+function pretty(name, group) {
+  const bits = name.replace(/_Drum_Rack$/, '_DrumRack').split('_')
+  const at = bits.findIndex((b) => b === group || b === 'Bass' || b === 'Synth' || b === 'Kick' || b === 'Drums'
+    || (group === 'Percussion' && b === 'Perc') || (group === 'Vocal' && (b === 'Vox' || b === 'Vocal')))
+  const pack = (at > 0 ? bits.slice(0, at) : bits.slice(0, 1)).join(' ')
+  const rest = bits.slice(at > 0 ? at : 1).filter((b) => !/^\d+$/.test(b) && !/^[A-G]#?m?$/.test(b))
+  const device = rest.length > 1 ? rest.pop().replace('DrumRack', 'Drum Rack') : group
+  return { title: rest.join(' ') || group, sub: `${pack} · ${device}` }
+}
+
+const ZONES = [
+  { t: 'LOW',  s: 'you feel it in the chest', lo: 30,   hi: 120,   target: -2 },
+  { t: 'BODY', s: 'warmth and weight',        lo: 120,  hi: 600,   target: -6 },
+  { t: 'TOP',  s: 'snap, chords, melody',     lo: 600,  hi: 6000,  target: -12 },
+  { t: 'AIR',  s: 'hats and shine',           lo: 6000, hi: 16000, target: -20 },
+]
+const MUD = 0.17
+
+// ---------- analysis (same as frame D) ----------
+const N = 4096, NB = 40, F0 = 20, F1 = 20000
+const bandHz = Array.from({ length: NB }, (_, b) => F0 * Math.pow(F1 / F0, (b + 0.5) / NB))
+function fft(re, im) {
+  const n = re.length
+  for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]] } }
+  for (let len = 2; len <= n; len <<= 1) {
+    const a = -2 * Math.PI / len, wr = Math.cos(a), wi = Math.sin(a)
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0
+      for (let k = 0; k < len / 2; k++) {
+        const ur = re[i + k], ui = im[i + k], h = i + k + len / 2
+        const vr = re[h] * cr - im[h] * ci, vi = re[h] * ci + im[h] * cr
+        re[i + k] = ur + vr; im[i + k] = ui + vi; re[h] = ur - vr; im[h] = ui - vi
+        const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t
+      }
+    }
+  }
+}
+function analyse(buffer) {
+  const sr = buffer.sampleRate, ch = buffer.numberOfChannels, x = new Float32Array(buffer.length)
+  for (let c = 0; c < ch; c++) { const d = buffer.getChannelData(c); for (let i = 0; i < x.length; i++) x[i] += d[i] / ch }
+  const hop = STEP * sr, steps = Math.floor(x.length / hop)
+  const win = Float32Array.from({ length: N }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1)))
+  const zoneOf = new Int8Array(N / 2).map((_, k) => { const f = k * sr / N; return ZONES.findIndex((z) => f >= z.lo && f < z.hi) })
+  const re = new Float32Array(N), im = new Float32Array(N), out = []
+  for (let s = 0; s < steps; s++) {
+    const c = Math.round(s * hop)
+    for (let i = 0; i < N; i++) { re[i] = (x[c + i] || 0) * win[i]; im[i] = 0 }
+    fft(re, im)
+    const z = new Float32Array(ZONES.length)
+    for (let k = 1; k < N / 2; k++) if (zoneOf[k] >= 0) z[zoneOf[k]] += re[k] * re[k] + im[k] * im[k]
+    out.push(z)
+  }
+  return out
+}
+
+// ================= audio =================
+const ctx = new (window.AudioContext || window.webkitAudioContext)()
+const master = ctx.createGain(); master.gain.value = 0.55
+const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 4
+master.connect(comp).connect(ctx.destination)
+let startAt = 0, playing = false
+const urlOf = (p) => `${STATIC}/${p.id}/ogg/${p.tonal ? `key-${key}/` : ''}${BPM}.ogg`
+// Some browsers (older iPhones) can't decode OGG. Then every part comes from
+// its MP4 render, which exists only in the part's own key: the key stays at
+// Bm and Random only picks parts written in that key.
+let mp4Only = false
+const mp4Of = (p) => `${STATIC}/${p.id}/render/${BPM}.mp4`
+async function fetchDecode(url) {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return ctx.decodeAudioData(await res.arrayBuffer())
+}
+async function loadPart(p) {
+  if (!mp4Only) {
+    try { p.buffer = await fetchDecode(urlOf(p)) } catch (e) {
+      if (String(e).includes('HTTP')) throw new Error(`${p.name}: ${e.message}`)
+      mp4Only = true
+    }
+  }
+  if (mp4Only) {
+    p.buffer = await fetchDecode(mp4Of(p))
+    keySel.disabled = true; keySel.title = 'This browser plays the parts in their own key only'
+  }
+  p.zones = analyse(p.buffer)
+}
+// Start (or restart) one part in step with the others.
+function startPart(p) {
+  if (p.src) { try { p.src.stop() } catch {} p.src.disconnect() }
+  if (!p.gain) { p.gain = ctx.createGain(); p.gain.connect(master) }
+  p.gain.gain.value = p.on ? 1 : 0
+  const src = ctx.createBufferSource(); src.buffer = p.buffer; src.loop = true; src.connect(p.gain)
+  const now = ctx.currentTime + 0.03
+  const offset = ((now - startAt) % p.buffer.duration + p.buffer.duration) % p.buffer.duration
+  src.start(now, offset); p.src = src
+}
+const playStep = () => playing && ctx.state === 'running' ? Math.floor((ctx.currentTime - startAt) / STEP) : -1
+
+// ================= the mix: zones and mud =================
+let REF = 1, mix = null
+function recompute() {
+  const on = PARTS.filter((p) => p.on && p.zones)
+  const steps = 128
+  const clash = [], fill = [], share = []
+  ZONES.forEach((zone, z) => {
+    let tot = 0, second = 0
+    for (let t = 0; t < steps; t++) {
+      const v = on.map((p) => p.zones[t % p.zones.length][z]); const s = v.reduce((a, b) => a + b, 0)
+      tot += s; second += s - Math.max(0, ...v)
+    }
+    clash.push(tot > 0 ? second / tot : 0)
+    const db = tot > 0 ? 10 * Math.log10(tot / steps / REF) : -99
+    fill.push(Math.max(0, Math.min(1.15, 0.8 + (db - zone.target) / 22)))
+    share.push(PARTS.map((p) => p.on && p.zones ? p.zones.reduce((a, e) => a + e[z], 0) : 0))
+  })
+  const live = Array.from({ length: steps }, (_, t) => ZONES.map((_, z) => on.reduce((a, p) => a + p.zones[t % p.zones.length][z], 0)))
+  mix = { clash, fill, share, live }
+  render()
+}
+
+// ================= UI =================
+const $ = (id) => document.getElementById(id)
+const keySel = $('key')
+KEYS.forEach((k, i) => keySel.add(new Option(k, i + 1)))
+keySel.value = key
+const partsEl = $('parts')
+function drawParts() {
+  partsEl.innerHTML = ''
+  PARTS.forEach((p, idx) => {
+    if (idx > stage) return                                   // the build shows what's in, plus the next part
+    const { title, sub } = pretty(p.name, p.group)
+    const row = document.createElement('div')
+    row.className = `part${idx === stage ? ' part--next' : p.on ? '' : ' part--off'}${p.fresh ? ' part--new' : ''}`
+    row.innerHTML = `<i style="background:${COLORS[p.group]}"></i><div class="part__n">${title}<small>${sub}${p.tonal ? ' · ' + KEYS[key - 1] : ''}</small></div>
+      <button title="Mute / unmute">${p.on ? '◉' : '○'}</button><button title="Swap for a random ${p.group.toLowerCase()} from the library">🎲</button>`
+    const [mute, dice] = row.querySelectorAll('button')
+    mute.onclick = () => { p.on = !p.on; if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02); drawParts(); recompute() }
+    dice.onclick = () => swap(p)
+    p.fresh = false; p.bar = row.querySelector('i')
+    partsEl.append(row)
+  })
+}
+const msg = (t, mud = false) => { $('msg').textContent = t; $('msg').classList.toggle('msg--mud', mud) }
+
+// ---------- the build ----------
+const STAGE0 = 'Build a midee track from nothing, one part at a time. Watch the four glasses fill up and the floor wake up.'
+const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, and take it as an Ableton project.'
+async function goTo(n) {
+  if (!playing) { await ctx.resume(); startAt = ctx.currentTime + 0.05; playing = true; PARTS.forEach(startPart) }
+  stage = Math.max(0, Math.min(PARTS.length, n))
+  PARTS.forEach((p, i) => {
+    const was = p.on; p.on = i < stage
+    if (p.on && !was && i === stage - 1) p.fresh = true
+    p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02)
+  })
+  drawStage(); drawParts(); recompute()
+}
+function drawStage() {
+  const done = stage >= PARTS.length
+  $('cstep').textContent = done ? 'Your track · 10 of 10' : `Build a track · step ${stage} of ${PARTS.length}`
+  $('ctext').innerHTML = done ? FINAL : stage === 0 ? STAGE0 : LESSONS[stage - 1].text
+  $('next').hidden = done; $('next').textContent = done ? '' : LESSONS[stage].add
+  $('back').disabled = stage === 0
+  $('tools').hidden = !done; $('skip').hidden = done
+  keySel.disabled = !done
+  const focus = stage > 0 && !done ? LESSONS[stage - 1].zone : -1
+  ZONES.forEach((z, i) => z.el.classList.toggle('z--focus', i === focus))
+}
+$('next').onclick = () => goTo(stage + 1)
+$('back').onclick = () => goTo(stage - 1)
+$('skip').onclick = () => goTo(PARTS.length)
+
+// Random: a part of the same kind from the whole library, at 128 BPM, in the key of the track.
+// The pool: ~950 library tracks across the groups, picked from the public
+// library list (pool.json), so the page also works away from midee.me.
+let POOL = null
+async function pick(group, exclude) {
+  POOL ??= (await (await fetch('pool.json')).json()).groups
+  const melodic = group === 'Bass' || group === 'Synth'
+  const ok = (POOL[group] || []).filter((t) => !exclude.has(t.id) && (!melodic || t.tonal) && (!mp4Only || !melodic || t.native === key))
+  return ok[Math.floor(Math.random() * ok.length)]
+}
+let busy = false
+async function swap(p) {
+  if (busy) return
+  busy = true; msg(`Finding another ${p.group.toLowerCase()}…`)
+  try {
+    const t = await pick(p.group, new Set(PARTS.map((x) => x.id)))
+    if (!t) throw new Error('nothing found')
+    const next = { id: t.id, name: t.name, group: p.group, tonal: t.tonal }
+    await loadPart(next)
+    Object.assign(p, next, { fresh: true, on: true })
+    if (playing) startPart(p)
+    drawParts(); recompute()
+    msg(`${pretty(p.name, p.group).title} from ${pretty(p.name, p.group).sub.split(' · ')[0]}, played in ${KEYS[key - 1]}.`)
+  } catch (e) { msg(`Could not swap: ${e.message}`) }
+  busy = false
+}
+$('random').onclick = async () => {
+  // swap three parts at once, never the kick, so the groove keeps its anchor
+  const pool = PARTS.filter((p) => p.group !== 'Kick').sort(() => Math.random() - 0.5).slice(0, 3)
+  for (const p of pool) await swap(p)
+}
+keySel.onchange = async () => {
+  key = Number(keySel.value); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
+  try {
+    await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
+    if (playing) PARTS.filter((p) => p.tonal).forEach(startPart)
+    drawParts(); recompute(); msg(`Now in ${KEYS[key - 1]}. Drums stay as they are, everything with notes moved.`)
+  } catch (e) { msg(`Could not change key: ${e.message}`) }
+  busy = false
+}
+$('play').onclick = async () => {
+  if (ctx.state === 'running') { await ctx.suspend(); $('play').textContent = 'Play' }
+  else { await ctx.resume(); $('play').textContent = 'Pause' }
+}
+$('get').onclick = () => {
+  $('sheetMeta').textContent = `Amber, remixed · Techno · 128 BPM · ${KEYS[key - 1]} · ${PARTS.filter((p) => p.on).length} parts`
+  $('sheetList').innerHTML = PARTS.filter((p) => p.on).map((p) => { const n = pretty(p.name, p.group); return `<li>${n.title} <small>${n.sub}</small></li>` }).join('')
+  $('sheet').hidden = false
+}
+$('sheetClose').onclick = () => { $('sheet').hidden = true }
+
+const zonesEl = $('zones')
+for (const z of ZONES) {
+  const el = document.createElement('div'); el.className = 'z'
+  el.innerHTML = `<div class="z__glass"><div class="z__fill"></div><div class="z__spill"></div></div><div class="z__t">${z.t}</div><div class="z__s">${z.s}</div>`
+  zonesEl.append(el); z.el = el; z.fillEl = el.querySelector('.z__fill')
+}
+function render() {
+  if (!mix) return
+  const mud = mix.clash[0] >= MUD
+  ZONES.forEach((z, i) => {
+    z.el.classList.toggle('z--mud', i === 0 && mud)
+    z.el.querySelector('.z__s').innerHTML = mix.fill[i] < 0.12 ? '<em>empty</em> · add something here'
+      : i === 0 && mud ? '<em>muddy</em> · two sounds at once' : z.s
+  })
+  if (mud) msg('Two sounds fight for the low end. Mute one of them, or roll the dice on a bass.', true)
+}
+function drawGlasses(st) {
+  if (!mix) return
+  ZONES.forEach((z, i) => {
+    const avg = mix.live.reduce((a, m) => a + m[i], 0) / mix.live.length
+    const pulse = st >= 0 && avg > 0 ? Math.min(1.6, mix.live[st % 128][i] / avg) : 1
+    const level = Math.min(1.1, mix.fill[i] * (0.82 + 0.18 * pulse))
+    const total = mix.share[i].reduce((a, b) => a + b, 0) || 1
+    if (z.fillEl.children.length !== PARTS.length) z.fillEl.innerHTML = PARTS.map(() => '<span></span>').join('')
+    PARTS.forEach((p, k) => {
+      const sp = z.fillEl.children[k]; sp.style.background = COLORS[p.group]
+      sp.style.height = `${(level * 100 * mix.share[i][k] / total).toFixed(1)}%`
+    })
+  })
+  // the part bars blink with their own sound
+  if (st >= 0) PARTS.forEach((p) => { if (p.bar && p.zones) { const e = p.zones[st % p.zones.length]; const v = e.reduce((a, b) => a + b, 0); p.peak = Math.max(p.peak || 1e-9, v); p.bar.style.opacity = p.on ? 0.35 + 0.65 * Math.sqrt(v / p.peak) : 0.2 } })
+}
+
+// ================= the room =================
+const renderer = new THREE.WebGLRenderer({ antialias: true })
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight); renderer.setClearColor(0x000000)
+document.body.prepend(renderer.domElement)
+const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x000000, 0.007)
+const camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 400)
+const controls = new OrbitControls(camera, renderer.domElement)
+controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 10; controls.maxDistance = 46; controls.maxPolarAngle = 1.45
+function frameCamera() {
+  const narrow = innerWidth < 900
+  camera.position.set(narrow ? 0 : 7, narrow ? 6 : 6.5, narrow ? 26 : 17); controls.target.set(narrow ? 0 : -3, 3.2, -6); controls.update()
+}
+frameCamera()
+
+let seed = 13
+const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
+const between = (a, b) => a + (b - a) * rnd()
+const dot = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64
+  const g = c.getContext('2d'), grad = g.createRadialGradient(32, 32, 0, 32, 32, 32)
+  grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.45, 'rgba(255,255,255,.85)'); grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c)
+})()
+const pmat = (size, opacity = 1) => new THREE.PointsMaterial({ size, map: dot, vertexColors: true, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending })
+function points(P, C, size, opacity) {
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3))
+  return new THREE.Points(geo, pmat(size, opacity))
+}
+const lineMat = (color, opacity) => new THREE.LineBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false })
+function lines(segs, color, opacity) {
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3))
+  return new THREE.LineSegments(geo, lineMat(color, opacity))
+}
+
+const W = 40, D = 26, H = 12, BOOTH_Z = -D / 2 + 3
+{
+  const P = [], C = [], push = (x, y, z, b) => { P.push(x, y, z); C.push(b, b, b) }
+  for (let x = -W / 2; x <= W / 2; x += 0.42) for (let z = -D / 2; z <= D / 2; z += 0.42) push(x + between(-.12, .12), 0, z + between(-.12, .12), 0.13 + 0.2 * (1 - (z + D / 2) / D) * rnd())
+  for (const side of [-1, 1]) for (let z = -D / 2; z <= D / 2; z += 0.5) for (let y = 0; y <= H; y += 0.5) {
+    const win = Math.abs(((z + 50) % 4) - 2) < 1.4 && y > 3.5 && y < 9.5
+    if (rnd() < (win ? 0.55 : 0.22)) push(side * W / 2, y, z, win ? 0.28 : 0.1)
+  }
+  for (let x = -W / 2; x <= W / 2; x += 0.5) for (let y = 0; y <= H; y += 0.5) {
+    const win = Math.abs(((x + 50) % 4) - 2) < 1.4 && y > 3.5 && y < 9.5
+    if (rnd() < (win ? 0.5 : 0.18)) push(x, y, -D / 2, win ? 0.3 : 0.1)
+  }
+  for (const x of [-12, -4, 4, 12]) for (const z of [-2, 7]) for (let y = 0; y < H; y += 0.12) push(x + between(-.1, .1), y, z + between(-.1, .1), 0.3)
+  for (let i = 0; i < 4500; i++) push(between(-W / 2, W / 2), between(0, H), between(-D / 2, D / 2), 0.03)
+  scene.add(points(P, C, 0.17, 1))
+  const segs = []
+  for (let z = -D / 2; z <= D / 2; z += 3.25) {
+    segs.push(-W / 2, H, z, 0, H + 3, z, 0, H + 3, z, W / 2, H, z)
+    for (let x = -W / 2; x < W / 2; x += 2.5) segs.push(x, H + 3 * (1 - Math.abs(x) / (W / 2)), z, x + 2.5, H, z)
+  }
+  scene.add(lines(segs, 0xffffff, 0.14))
+  // the booth and the decks on it
+  const booth = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(6, 1.2, 1.4)), lineMat(0xffffff, 0.5)); booth.position.set(0, 0.6, BOOTH_Z); scene.add(booth)
+  for (const x of [-1.6, 0, 1.6]) { const d = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(x ? 1.2 : 0.8, 0.12, 0.9)), lineMat(0xffffff, 0.6)); d.position.set(x, 1.26, BOOTH_Z); scene.add(d) }
+}
+
+// the club system
+const SUBC = new THREE.Color('#a78bfa'), TOPC = new THREE.Color('#5eead4'), MUDC = new THREE.Color('#7c6f5e')
+const subs = [], tops = []
+for (const x of [-9, -6.6, 6.6, 9]) for (let k = 0; k < 2; k++) {
+  const geo = new THREE.BoxGeometry(1.8, 1, 1.2)
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), lineMat(SUBC, 0.9))
+  const glow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: SUBC.clone(), transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false }))
+  for (const m of [edge, glow]) { m.position.set(x, 0.5 + k, BOOTH_Z + 0.6); scene.add(m) }
+  subs.push({ edge, glow, x })
+}
+for (const [x, y, z] of [[-10.5, 7.2, BOOTH_Z + 1.2], [10.5, 7.2, BOOTH_Z + 1.2]]) for (let k = 0; k < 6; k++) {
+  const geo = new THREE.BoxGeometry(1.3, 0.38, 0.8)
+  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), lineMat(TOPC, 0.9))
+  const glow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: TOPC, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false }))
+  for (const m of [edge, glow]) { m.position.set(x, y - k * 0.4, z + k * 0.04); m.rotation.x = k * 0.06; scene.add(m) }
+  tops.push({ glow })
+}
+
+// ---------- the laser: one magenta beam, like the photo in the /breakdowns hero ----------
+// From the booth up to the far corner of the roof. It sways slowly over four
+// bars and flares on the kick.
+const LASER = new THREE.Color('#ec4899')                      // MAGENTA in halftone-hero.component.ts
+const laserGeo = new THREE.BufferGeometry()
+const lpos = new Float32Array(3 * 2 * 3)                      // 3 parallel lines = a little thickness
+laserGeo.setAttribute('position', new THREE.BufferAttribute(lpos, 3))
+const laserMat = new THREE.LineBasicMaterial({ color: LASER, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false })
+scene.add(new THREE.LineSegments(laserGeo, laserMat))
+const laserDot = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ size: 0.9, map: dot, color: LASER, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }))
+const ldot = new Float32Array(3); laserDot.geometry.setAttribute('position', new THREE.BufferAttribute(ldot, 3)); scene.add(laserDot)
+const L0 = new THREE.Vector3(2.5, 2.4, BOOTH_Z + 0.5), L1 = new THREE.Vector3(16, H + 1.5, -D / 2 + 1)
+function drawLasers(beat, kick) {
+  const sway = Math.sin(beat * Math.PI / 8)                   // one slow swing every 4 bars
+  const end = L1.clone().add(new THREE.Vector3(-6 * (0.5 + 0.5 * sway), -2 * (0.5 - 0.5 * sway), 0))
+  let o = 0
+  for (const off of [-0.025, 0, 0.025]) { lpos[o++] = L0.x + off; lpos[o++] = L0.y; lpos[o++] = L0.z; lpos[o++] = end.x + off * 3; lpos[o++] = end.y; lpos[o++] = end.z }
+  ldot[0] = L0.x; ldot[1] = L0.y; ldot[2] = L0.z
+  laserGeo.attributes.position.needsUpdate = true; laserDot.geometry.attributes.position.needsUpdate = true
+  laserMat.opacity = 0.45 + 0.55 * Math.min(1, kick)
+  laserDot.material.opacity = laserMat.opacity
+}
+
+// ---------- people: the DJ behind the decks and the crowd ----------
+const BODY = []
+for (let k = 0; k < 6; k++) BODY.push([k / 6 * 0.46, -0.09, 0, 'leg'], [k / 6 * 0.46, 0.09, 0, 'leg'])
+for (let k = 0; k < 8; k++) BODY.push([0.48 + k / 8 * 0.34, between(-0.13, 0.13), between(-0.06, 0.06), 'torso'])
+for (let k = 0; k < 6; k++) BODY.push([0.9 + between(-0.04, 0.04), between(-0.07, 0.07), between(-0.07, 0.07), 'head'])
+for (const s of [-1, 1]) BODY.push([0.78, s * 0.2, -0.02, 'arm'], [0.68, s * 0.22, -0.12, 'arm'], [0.72, s * 0.14, -0.22, 'hand'])
+const dancers = []
+for (let i = 0; i < 170; i++) {
+  const z = BOOTH_Z + 3.2 + Math.pow(rnd(), 1.5) * (D - 7)
+  const x = between(-W / 2 + 4, W / 2 - 4) * (0.5 + 0.5 * (z - BOOTH_Z) / D)
+  dancers.push({ x, z, h: between(1.6, 1.92), face: -1, phase: between(-0.06, 0.06), sway: between(0.6, 1.2), style: rnd() < 0.3 ? 1 : 0, b: 0.45 + 0.4 * rnd() })
+}
+// the DJ stands behind the booth, faces the crowd, a bit brighter
+dancers.push({ x: 0.2, z: BOOTH_Z - 1.1, h: 1.85, face: 1, phase: 0, sway: 0.8, style: 0, b: 1, dj: true })
+const crowdGeo = new THREE.BufferGeometry()
+const cpos = new Float32Array(dancers.length * BODY.length * 3), ccol = new Float32Array(dancers.length * BODY.length * 3)
+dancers.forEach((d, i) => BODY.forEach((_, j) => { const o = (i * BODY.length + j) * 3; ccol[o] = d.dj ? 0.99 : d.b; ccol[o + 1] = d.dj ? 0.88 : d.b; ccol[o + 2] = d.dj ? 0.28 : d.b }))
+crowdGeo.setAttribute('position', new THREE.BufferAttribute(cpos, 3)); crowdGeo.setAttribute('color', new THREE.BufferAttribute(ccol, 3))
+scene.add(new THREE.Points(crowdGeo, pmat(0.2, 0.95)))
+
+let groove = 0.3, sync = 1
+function dance(beat) {
+  let o = 0
+  for (const d of dancers) {
+    const ph = beat + d.phase + (1 - sync) * (d.phase * 8)
+    const g = d.dj ? Math.max(groove, 0.5) : groove
+    const bounce = g * (d.dj ? 0.06 : 0.11) * (0.5 + 0.5 * Math.cos(2 * Math.PI * ph))
+    const sway = g * 0.07 * d.sway * Math.sin(Math.PI * ph)
+    const nod = g * (d.dj ? 0.08 : 0.05) * Math.max(0, Math.cos(2 * Math.PI * ph))
+    const step = d.style ? g * 0.05 * Math.sin(Math.PI * ph * 0.5) : 0
+    // the DJ: one hand on the mixer, the other lifts on the last beat of every 4th bar
+    const lift = d.dj ? Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, (beat % 16) - 14) / 2))) : 0
+    for (const [fy, lx, lz, part] of BODY) {
+      let y = fy * d.h, x = lx, z = lz * d.face * -1
+      if (part === 'leg') y *= 1 - bounce / (0.46 * d.h)
+      else { y -= bounce; x += sway * (fy / 0.9) }
+      if (part === 'head') { y -= nod; z += nod * 0.6 * d.face }
+      if (part === 'hand') {
+        if (d.dj) { if (lx > 0) { y += lift * 0.75; x += lift * 0.05 } else { x += 0.12 * Math.sin(beat * Math.PI / 2); y -= 0.05; z += 0.12 } }
+        else { y += g * 0.06 * Math.sin(2 * Math.PI * ph + 1); x *= 1 + 0.3 * g * Math.sin(Math.PI * ph) }
+      }
+      cpos[o++] = d.x + x + step; cpos[o++] = y + (d.dj ? 0.15 : 0); cpos[o++] = d.z + z
+    }
+  }
+  crowdGeo.attributes.position.needsUpdate = true
+}
+
+// ================= the loop =================
+const clock = new THREE.Clock()
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05), now = clock.elapsedTime
+  const running = playing && ctx.state === 'running'
+  const st = playStep()
+  const beat = running ? (ctx.currentTime - startAt) * BPM / 60 : now * 0.5
+  const mud = mix && mix.clash[0] >= MUD
+  const build = Math.min(1, stage / 6)
+  groove += ((running && stage ? (mud ? 0.5 : 1) * (0.35 + 0.65 * build) : 0.25) - groove) * Math.min(1, dt * 2.5)
+  sync += ((mud ? 0.3 : 1) - sync) * Math.min(1, dt * 1.5)
+  dance(beat)
+  let low = 0, hi = 0
+  if (mix && st >= 0) { const m = mix.live[st % 128]; low = m[0] / REF; hi = (m[1] + m[2] + m[3]) / REF }
+  drawLasers(beat, running ? Math.min(1, low) : 0.2)
+  const subCol = SUBC.clone().lerp(MUDC, mud ? 1 : 0)
+  for (const s of subs) {
+    s.glow.material.color.copy(subCol); s.edge.material.color.copy(subCol)
+    s.glow.material.opacity = 0.08 + 0.5 * Math.min(1, low)
+    s.glow.scale.setScalar(1 + 0.05 * Math.min(1, low) + (mud ? 0.05 * Math.sin(now * 37 + s.x) : 0))
+  }
+  for (const t of tops) t.glow.material.opacity = 0.06 + 0.7 * Math.min(1, hi)
+  drawGlasses(st)
+  controls.update(); renderer.render(scene, camera); requestAnimationFrame(tick)
+}
+tick()
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); frameCamera() })
+
+// ================= start =================
+drawParts()
+Promise.all(PARTS.map(loadPart)).then(() => {
+  const k = PARTS[0].zones, b = PARTS[1].zones
+  REF = k.reduce((a, _, t) => a + k[t][0] + b[t % b.length][0], 0) / k.length
+  recompute(); drawParts()
+  $('next').disabled = false; drawStage()
+  msg('Amber: ten parts of one midee track, real previews from the library.')
+}).catch((e) => { $('next').textContent = 'Could not load'; msg(e.message) })
+</script>
+</body>
+</html>
