@@ -50,6 +50,7 @@
   .link { background: none; border: 0; padding: 0; margin-top: 10px; color: var(--dim); font: 11px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; cursor: pointer; text-decoration: underline; }
   .z--focus .z__glass { border-color: #fde047; box-shadow: 0 0 0 3px rgba(253,224,71,.18); }
   .z--focus .z__t { color: #fde047; }
+  .deck__handle { display: none; }
   .msg { font-size: 13px; line-height: 1.4; color: var(--dim); margin-top: 10px; min-height: 18px; }
   .msg--mud { color: #e7d8c3; }
 
@@ -79,7 +80,14 @@
 
   @media (max-width: 900px) {
     .note { display: none; }
-    .deck { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 52vh; padding: 12px; }
+    .deck { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 56vh; padding: 10px 12px 12px; background: rgba(0,0,0,.72); }
+    .deck__handle { display: flex; justify-content: space-between; width: 100%; padding: 2px 2px 10px; border: 0; background: none; cursor: pointer;
+                    font: 11px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); }
+    .deck__handle span:first-child { color: #e7e7ea; }
+    .deck--min .deck__more, .deck--min .msg { display: none; }
+    .deck--min .coach { margin-top: 0; padding: 8px 10px 8px 12px; }
+    .coach__t { font-size: 14px; }
+    .deck--min .link { margin-top: 8px; }
     .zones { right: 10px; left: 10px; top: 64px; bottom: auto; justify-content: space-between; gap: 6px; }
     .z { width: 22%; } .z__glass { height: 80px; } .z__s { display: none; }
   }
@@ -92,13 +100,16 @@
   <div class="hud">midee · <b>sound map</b> · in the club</div>
   <div class="note">real midee previews · drag to turn the room</div>
 
-  <div class="deck">
-    <span class="deck__tag">midee composition</span>
-    <div class="deck__t">AMBER</div>
-    <div class="deck__meta">Techno · 128 BPM · key
-      <select id="key" aria-label="Key"></select>
+  <div class="deck deck--min" id="deck">
+    <button class="deck__handle" id="handle" aria-expanded="false"><span id="hcount">Amber</span><span id="harrow">show parts ▴</span></button>
+    <div class="deck__more">
+      <span class="deck__tag">midee composition</span>
+      <div class="deck__t">AMBER</div>
+      <div class="deck__meta">Techno · 128 BPM · key
+        <select id="key" aria-label="Key"></select>
+      </div>
+      <div class="parts" id="parts"></div>
     </div>
-    <div class="parts" id="parts"></div>
     <div class="coach">
       <div class="coach__step" id="cstep">Build a track · step 0 of 10</div>
       <p class="coach__t" id="ctext">Loading the ten parts of Amber…</p>
@@ -312,7 +323,7 @@ function drawParts() {
     row.innerHTML = `<i style="background:${COLORS[p.group]}"></i><div class="part__n">${title}<small>${sub}${p.tonal ? ' · ' + KEYS[key - 1] : ''}</small></div>
       <button title="Mute / unmute">${p.on ? '◉' : '○'}</button><button title="Swap for a random ${p.group.toLowerCase()} from the library">🎲</button>`
     const [mute, dice] = row.querySelectorAll('button')
-    mute.onclick = () => { p.on = !p.on; if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02); drawParts(); recompute() }
+    mute.onclick = () => { p.on = !p.on; if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02); drawParts(); recompute(); drawHandle() }
     dice.onclick = () => swap(p)
     p.fresh = false; p.bar = row.querySelector('i')
     partsEl.append(row)
@@ -334,6 +345,7 @@ async function goTo(n) {
   drawStage(); drawParts(); recompute()
 }
 function drawStage() {
+  drawHandle()
   const done = stage >= PARTS.length
   $('cstep').textContent = done ? 'Your track · 10 of 10' : `Build a track · step ${stage} of ${PARTS.length}`
   $('ctext').innerHTML = done ? FINAL : stage === 0 ? STAGE0 : LESSONS[stage - 1].text
@@ -343,6 +355,16 @@ function drawStage() {
   keySel.disabled = !done
   const focus = stage > 0 && !done ? LESSONS[stage - 1].zone : -1
   ZONES.forEach((z, i) => z.el.classList.toggle('z--focus', i === focus))
+}
+$('handle').onclick = () => {
+  const min = $('deck').classList.toggle('deck--min')
+  $('handle').setAttribute('aria-expanded', String(!min))
+  drawHandle()
+}
+function drawHandle() {
+  const min = $('deck').classList.contains('deck--min')
+  $('hcount').textContent = `Amber · ${PARTS.filter((p) => p.on).length} of ${PARTS.length} parts`
+  $('harrow').textContent = min ? 'show parts ▴' : 'hide ▾'
 }
 $('next').onclick = () => goTo(stage + 1)
 $('back').onclick = () => goTo(stage - 1)
