@@ -94,6 +94,17 @@
   .welcome .coach__step { margin: 0 0 14px; }
   .welcome .btn { width: 100%; padding: 14px; }
 
+  /* speaker card: tap a sub or a top in the room */
+  .spk { position: fixed; top: 48px; right: 24px; width: 320px; box-sizing: border-box; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0,0,0,.72); backdrop-filter: blur(8px); z-index: 4; }
+  .spk__x { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: none; color: #e7e7ea; cursor: pointer; font-size: 16px; line-height: 1; }
+  .spk__h { font: 600 18px/1.2 var(--mono); letter-spacing: 1px; margin: 8px 30px 8px 0; }
+  .spk__t { font-size: 14px; line-height: 1.45; color: #c9c9cf; margin: 0 0 10px; }
+  .spk__tip { color: var(--dim); margin: 10px 0 0; }
+  .spk__now { font: 11px/1.5 var(--mono); }
+  .spk__now b { display: block; color: var(--dim); font-weight: 400; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 4px; }
+  .spk__now i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+  .spk__now div { overflow-wrap: anywhere; }
+
   /* the flow inside the sheet */
   .sheet { z-index: 6; }
   .sheet__step { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; margin-bottom: 10px; }
@@ -121,6 +132,7 @@
     .coach__t { font-size: 14px; }
     .deck--min .link { margin-top: 8px; }
     .zones { right: 10px; left: 10px; top: 64px; bottom: auto; justify-content: space-between; gap: 6px; }
+    .spk { top: 170px; left: 10px; right: 10px; width: auto; max-height: calc(100vh - 190px); overflow: auto; }
     .z { width: 22%; } .z__glass { height: 80px; } .z__s { display: none; }
   }
 </style>
@@ -130,7 +142,16 @@
 </head>
 <body>
   <div class="hud">midee · <b>sound map</b> · in the club</div>
-  <div class="note">real midee previews · drag to turn the room</div>
+  <div class="note">real midee previews · drag to turn the room · tap a speaker</div>
+
+  <div class="spk" id="spk" hidden>
+    <button class="spk__x" id="spkX" aria-label="Close">×</button>
+    <div class="coach__step" id="spkStep"></div>
+    <div class="spk__h" id="spkH"></div>
+    <p class="spk__t" id="spkT"></p>
+    <div class="spk__now" id="spkNow"></div>
+    <p class="spk__t spk__tip" id="spkTip"></p>
+  </div>
 
   <div class="deck deck--min" id="deck">
     <button class="deck__handle" id="handle" aria-expanded="false"><span id="hcount">Amber</span><span id="harrow">show parts ▴</span></button>
@@ -355,6 +376,7 @@ function recompute() {
   const live = Array.from({ length: steps }, (_, t) => ZONES.map((_, z) => on.reduce((a, p) => a + p.zones[t % p.zones.length][z], 0)))
   mix = { clash, fill, share, live }
   render()
+  drawSpk()
 }
 
 // ================= UI =================
@@ -751,6 +773,60 @@ for (const [x, y, z] of [[-10.5, 7.2, BOOTH_Z + 1.2], [10.5, 7.2, BOOTH_Z + 1.2]
   const glow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: TOPC, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false }))
   for (const m of [edge, glow]) { m.position.set(x, y - k * 0.4, z + k * 0.04); m.rotation.x = k * 0.06; scene.add(m) }
   tops.push({ glow })
+}
+
+// ---------- tap a speaker ----------
+// People tap the subs and the hanging tops, so they say what they are, what
+// part of the sound they play and which parts of the track go through them
+// right now. A club system splits sound by frequency, not by instrument: the
+// subs take the low end of every part, the tops everything above it.
+const SPEAKERS = {
+  sub: {
+    step: 'Subwoofers · LOW',
+    h: 'The subs',
+    t: 'The big boxes on the floor play only the lowest notes, below about 100 Hz. That is the LOW glass. You feel it in your chest more than you hear it.',
+    tip: 'Kick and bass meet here. When two parts fight for it, the subs turn muddy brown and the floor stops moving together. Give each one its own moment.',
+    zones: [0],
+  },
+  top: {
+    step: 'Tops · BODY · TOP · AIR',
+    h: 'The tops',
+    t: 'The boxes hanging above the booth play everything above the subs: the body of the bass, the snare, chords, melody, hats and shine.',
+    tip: 'One part can use both. A kick thumps in the subs and clicks in the tops, and a bass has its weight below and its character above.',
+    zones: [1, 2, 3],
+  },
+}
+let spkKind = null
+function drawSpk() {
+  if (!spkKind) return
+  const k = SPEAKERS[spkKind]
+  $('spkStep').textContent = k.step; $('spkH').textContent = k.h; $('spkT').textContent = k.t; $('spkTip').textContent = k.tip
+  // A part counts when it brings at least a tenth of what these speakers play.
+  const amount = PARTS.map((_, i) => mix ? k.zones.reduce((a, z) => a + mix.share[z][i], 0) : 0)
+  const total = amount.reduce((a, b) => a + b, 0)
+  const now = PARTS.map((p, i) => ({ p, v: amount[i] })).filter(({ p, v }) => p.on && total > 0 && v / total >= 0.1).sort((a, b) => b.v - a.v)
+  $('spkNow').innerHTML = now.length
+    ? `<b>Playing here now</b>${now.map(({ p, v }) => `<div><i style="background:${COLORS[p.group]}"></i>${midName(p)} · ${Math.round(100 * v / total)}%</div>`).join('')}`
+    : '<b>Playing here now</b><div style="color:var(--dim)">Nothing yet. Add a part.</div>'
+  $('spk').hidden = false
+}
+$('spkX').onclick = () => { spkKind = null; $('spk').hidden = true }
+{
+  const ray = new THREE.Raycaster(), ptr = new THREE.Vector2()
+  const targets = [...subs.map((s) => [s.glow, 'sub']), ...tops.map((t) => [t.glow, 'top'])]
+  let down = null
+  renderer.domElement.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY] })
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    // a drag turns the room; only a tap opens the card
+    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 8) return
+    const r = renderer.domElement.getBoundingClientRect()
+    ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
+    ray.setFromCamera(ptr, camera)
+    const hit = ray.intersectObjects(targets.map(([m]) => m))[0]
+    if (!hit) return
+    spkKind = targets.find(([m]) => m === hit.object)[1]
+    drawSpk()
+  })
 }
 
 // ---------- the laser: one magenta beam, like the photo in the /breakdowns hero ----------
