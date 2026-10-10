@@ -27,7 +27,10 @@
   .part:hover { background: rgba(255,255,255,.04); }
   .part i { width: 8px; height: 22px; border-radius: 3px; transition: opacity .08s; }
   .part__n { font: 12px/1.25 var(--mono); overflow-wrap: anywhere; overflow: hidden; }
-  .part__n small { display: block; font: 10px/1.4 var(--mono); letter-spacing: .8px; color: var(--dim); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .part__n small { display: block; margin-top: 3px; white-space: nowrap; overflow: hidden; }
+  .tag { display: inline-block; margin-right: 4px; padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; font: 9px/1.2 var(--mono); letter-spacing: .6px; color: var(--dim); text-transform: uppercase; }
+  .powered { display: block; margin-top: 12px; font: 10px/1.4 var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); text-decoration: none; }
+  .powered b { color: #fde047; font-weight: 600; }
   .part button { width: 32px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: none; cursor: pointer; font-size: 14px; line-height: 1; }
   .part button:hover { border-color: #fff; }
   .part--off { opacity: .4; }
@@ -185,6 +188,7 @@
     </div>
     <button class="link" id="skip">Skip to the full track</button>
     <div class="msg" id="msg"></div>
+    <a class="powered" href="https://midee.me/?utm_source=club&amp;utm_medium=powered" target="_blank" rel="noopener">All sounds powered by the <b>midee plugin</b> →</a>
   </div>
 
   <div class="zones" id="zones"></div>
@@ -198,6 +202,7 @@
         <p class="coach__t">At the end you change the key, roll the dice on the parts, and download the whole track as a project you can open in Ableton.</p>
       </div>
       <div class="coach__step">About 5 minutes · turn the sound on</div>
+      <a class="powered" style="margin:-6px 0 14px" href="https://midee.me/?utm_source=club&amp;utm_medium=powered" target="_blank" rel="noopener">All sounds powered by the <b>midee plugin</b> →</a>
       <button class="btn btn--next" id="enter" disabled>Loading the club…</button>
     </div>
   </div>
@@ -255,6 +260,14 @@ let stage = 0
 // The part's name exactly as in the midee library. A tonal part says the key
 // it plays in, the way the site renames a sound for the key you picked
 // (renameTrackForKey: the first segment like Bm / C#m is replaced).
+// Tags as in the midee library: the kind of sound and the Ableton instrument
+// it is built on (the last part of the name: Simpler, Wavetable, Analog,
+// Drum_Rack).
+function device(p) {
+  const m = /_(Simpler|Wavetable|Analog|Operator|Drift|Sampler|Meld|Collision|Drum_Rack|Instrument_Rack)$/.exec(p.name)
+  return m ? m[1].replace('_', ' ') : ''
+}
+const tags = (p) => `<span class="tag">${p.group}</span>${device(p) ? `<span class="tag">${device(p)}</span>` : ''}`
 function midName(p) {
   if (!p.tonal) return p.name
   const bits = p.name.split('_'), at = bits.findIndex((b) => /^[A-G]#?m$/.test(b))
@@ -392,7 +405,7 @@ function drawParts() {
     if (idx > stage) return                                   // the build shows what's in, plus the next part
     const row = document.createElement('div')
     row.className = `part${idx === stage ? ' part--next' : p.on ? '' : ' part--off'}${p.fresh ? ' part--new' : ''}`
-    row.innerHTML = `<i style="background:${COLORS[p.group]}"></i><div class="part__n">${midName(p)}<small>${p.group}</small></div>
+    row.innerHTML = `<i style="background:${COLORS[p.group]}"></i><div class="part__n">${midName(p)}<small>${tags(p)}</small></div>
       <button title="Mute / unmute">${p.on ? '◉' : '○'}</button><button title="Swap for a random ${p.group.toLowerCase()} from the library">🎲</button>`
     const [mute, dice] = row.querySelectorAll('button')
     mute.onclick = () => { p.on = !p.on; if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02); drawParts(); recompute(); drawHandle(); if (stage >= PARTS.length) drawIdeas() }
@@ -577,7 +590,7 @@ function showProject() {
     <div class="sheet__step">Your first Ableton project</div>
     <div class="sheet__h">${esc(projectName())}</div>
     <p>Techno · 128 BPM · ${KEYS[key - 1]} · ${on.length} parts</p>
-    <ol>${on.map((p) => `<li style="font:12px/1.5 var(--mono);overflow-wrap:anywhere${isDemo(p) ? '' : ';color:var(--dim)'}">${esc(midName(p))}${isDemo(p) ? ' <small style="color:#fde047">· demo</small>' : ''}</li>`).join('')}</ol>
+    <ol>${on.map((p) => `<li style="font:12px/1.5 var(--mono);overflow-wrap:anywhere;margin-bottom:4px${isDemo(p) ? '' : ';color:var(--dim)'}">${esc(midName(p))}${isDemo(p) ? ' <small style="color:#fde047">· demo</small>' : ''}<br>${tags(p)}</li>`).join('')}</ol>
     <p><b style="color:#e7e7ea">Start with the free demo:</b> the ${demo.length} parts marked demo. Open it in Ableton and see how a real track is put together: every part on its own track, MIDI you can change, every knob of the Rack.</p>
     ${IDEAS.length > 1 ? `<p>Your ideas: ${IDEAS.map((d) => `Idea ${d.n} (${KEYS[d.key - 1]})`).join(', ')}. Each one comes as its own scene, like in your midee project.</p>` : ''}
     <p>Made for Ableton Live 12 Suite. No Suite yet? The free trial from Ableton opens it.</p>

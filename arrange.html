@@ -68,6 +68,9 @@
   .btn--next { background: #fde047; color: #000; border-color: #fde047; }
   .btn--get { background: #c4b5fd; color: #000; border-color: #c4b5fd; }
   .btn[disabled] { opacity: .5; cursor: default; }
+  .tag { display: inline-block; margin-left: 4px; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; font: 8px/1.2 var(--mono); letter-spacing: .5px; color: var(--dim); text-transform: uppercase; }
+  .powered { display: block; margin-top: 14px; font: 10px/1.4 var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--dim); text-decoration: none; }
+  .powered b { color: #fde047; font-weight: 600; }
   .msg { font-size: 13px; color: var(--dim); margin-top: 10px; min-height: 18px; max-width: 640px; }
 
   @media (max-width: 760px) {
@@ -119,6 +122,7 @@
     <a class="btn" href="./">Back to the club</a>
   </div>
   <div class="msg" id="msg"></div>
+  <a class="powered" href="https://midee.me/?utm_source=arrange&amp;utm_medium=powered" target="_blank" rel="noopener">All sounds powered by the <b>midee plugin</b> →</a>
 
 <script>
 const STATIC = 'https://midee.fra1.digitaloceanspaces.com/midee/tracks'
@@ -271,7 +275,9 @@ function clipsFor(i) { return mode === 'loop' ? [[1, LOOP]] : mode === 'arranged
 
 PARTS.forEach((p) => {
   const h = document.createElement('div'); h.className = 'hdr'
-  h.innerHTML = `<i style="background:${COLORS[p.group]}"></i><span title="${p.name}">${p.name}</span>`
+  const dev = (/_(Simpler|Wavetable|Analog|Operator|Drift|Sampler|Meld|Collision|Drum_Rack)$/.exec(p.name) || [])[1]
+  h.title = `${p.name} · ${p.group}${dev ? ' · ' + dev.replace('_', ' ') : ''}`
+  h.innerHTML = `<i style="background:${COLORS[p.group]}"></i><span>${p.name}</span>`
   $('hdrs').append(h)
   const lane = document.createElement('div'); lane.className = 'lane'; $('lanes').append(lane); p.lane = lane
 })
