@@ -147,12 +147,16 @@
     .deck__handle { display: flex; justify-content: space-between; width: 100%; padding: 2px 2px 10px; border: 0; background: none; cursor: pointer;
                     font: 11px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); }
     .deck__handle span:first-child { color: #e7e7ea; }
+    /* the handle stays on top while the parts scroll under it */
+    .deck__handle { position: sticky; top: -10px; z-index: 2; margin-top: -10px; padding-top: 12px; background: #0a0a0b; }
     .deck--min .deck__more, .deck--min .msg { display: none; }
     .deck--min .coach { margin-top: 0; padding: 8px 10px 8px 12px; }
     .coach__t { font-size: 14px; }
     .deck--min .link { margin-top: 8px; }
     .zones { right: 10px; left: 10px; top: 64px; bottom: auto; justify-content: space-between; gap: 6px; }
-    .spk { top: 170px; left: 10px; right: 10px; width: auto; max-height: calc(100vh - 190px); overflow: auto; }
+    /* on a phone the speaker card takes the deck's place at the bottom, so the two never overlap */
+    .spk { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 56vh; overflow: auto; z-index: 6; background: rgba(0,0,0,.86); }
+    body.spk-open .deck { visibility: hidden; }
     .z { width: 22%; } .z__glass { height: 80px; } .z__s { display: none; }
   }
 </style>
@@ -473,6 +477,9 @@ const FINAL = 'That is a full track. Every glass is filled and nothing fights in
 // On a phone the deck is folded. When the last part is in, it opens by itself
 // and the dice light up: this is where the track becomes yours. Once.
 let revealed = false
+// On a phone the deck is a sheet that scrolls: bring its end (Catch idea, Get) into view.
+// Called after any scrollIntoView, so it wins over a nearer scroll still in progress.
+const toDeckEnd = () => { if (!matchMedia('(min-width: 901px)').matches) setTimeout(() => $('deck').scrollTo({ top: $('deck').scrollHeight, behavior: 'smooth' }), 60) }
 function hint(els) { els.forEach((b) => { b.classList.remove('hint'); void b.offsetWidth; b.classList.add('hint') }) }
 // First keep what you have, then change it: Catch idea lights up, and the
 // dice only after the first idea is caught.
@@ -484,7 +491,9 @@ let diceHinted = false
 function hintDice() {
   if (diceHinted) return
   diceHinted = true
-  hint([...partsEl.querySelectorAll('.part button:last-child')])
+  // the dice, and the way out: the project button lights up with them
+  hint([...partsEl.querySelectorAll('.part button:last-child'), $('get')])
+  toDeckEnd()
 }
 function revealEnd() {
   if (revealed) return
@@ -493,7 +502,8 @@ function revealEnd() {
   const deck = $('deck')
   deck.classList.remove('deck--min'); deck.classList.add('deck--reveal')
   $('handle').setAttribute('aria-expanded', 'true'); drawHandle()
-  setTimeout(hintCatch, 500)
+  // the end of the deck — Catch idea and Get your project — comes into view, not the top of the list
+  setTimeout(() => { hintCatch(); toDeckEnd() }, 500)
   setTimeout(() => deck.classList.remove('deck--reveal'), 900)
 }
 async function goTo(n) {
@@ -539,7 +549,7 @@ $('handle').onclick = () => {
 function drawHandle() {
   const min = $('deck').classList.contains('deck--min')
   $('hcount').textContent = `Amber · ${PARTS.filter((p) => p.on).length} of ${PARTS.length} parts`
-  $('harrow').textContent = min ? 'show parts ▴' : 'hide ▾'
+  $('harrow').textContent = min ? 'show parts ▴' : 'see the club ▾'
 }
 $('next').onclick = () => goTo(stage + 1)
 $('back').onclick = () => goTo(stage - 1)
@@ -960,9 +970,10 @@ function drawSpk() {
   $('spkNow').innerHTML = now.length
     ? `<b>Playing here now</b>${now.map(({ p, v }) => `<div><i style="background:${COLORS[p.group]}"></i>${midName(p)} · ${Math.round(100 * v / total)}%</div>`).join('')}`
     : '<b>Playing here now</b><div style="color:var(--dim)">Nothing yet. Add a part.</div>'
-  $('spk').hidden = false
+  $('spk').hidden = false; document.body.classList.add('spk-open')
 }
-$('spkX').onclick = () => { spkKind = null; $('spk').hidden = true }
+const closeSpk = () => { spkKind = null; $('spk').hidden = true; document.body.classList.remove('spk-open') }
+$('spkX').onclick = closeSpk
 {
   const ray = new THREE.Raycaster(), ptr = new THREE.Vector2()
   const targets = [...subs.map((s) => [s.glow, 'sub']), ...tops.map((t) => [t.glow, 'top'])]
@@ -975,7 +986,8 @@ $('spkX').onclick = () => { spkKind = null; $('spk').hidden = true }
     ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
     ray.setFromCamera(ptr, camera)
     const hit = ray.intersectObjects(targets.map(([m]) => m))[0]
-    if (!hit) return
+    // on a phone a tap on the empty floor closes the card and brings the deck back
+    if (!hit) { if (spkKind && !matchMedia('(min-width: 901px)').matches) closeSpk(); return }
     spkKind = targets.find(([m]) => m === hit.object)[1]
     drawSpk()
   })
