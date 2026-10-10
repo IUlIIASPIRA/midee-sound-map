@@ -517,7 +517,9 @@ function drawIdeas() {
 $('catch').onclick = () => catchIdea()
 
 // ================= the take-home flow =================
-// Project → price (fake door) → email → download → five questions → thanks.
+// Project → four questions → price (fake door) → email → download → thanks.
+// Julie 10.10: the questions come before the person gets the project. The
+// price screen is the last question, so it is not asked twice.
 // Preview: everything stays in this page; see the head comment.
 const PRICES = ['€5', '€10', '€20']            // placeholders
 const answers = {}
@@ -547,13 +549,13 @@ function showProject() {
     <p>Every part opens on its own track as MIDI with its Ableton Rack, so you can change the notes and turn every knob.</p>
     <p>Made for Ableton Live 12 Suite. No Suite yet? The free trial from Ableton opens it.</p>
     <div class="row"><button class="btn" data-close>Back</button><button class="btn btn--go" id="go">Get it</button></div>`,
-  () => { $('go').onclick = showPrice })
+  () => { $('go').onclick = () => ask(0) })
 }
 
 function showPrice() {
   const list = [...PRICES, 'I wouldn\'t pay for it']
   screen(`
-    <div class="sheet__step">One question first</div>
+    <div class="sheet__step">Last question</div>
     <div class="sheet__h">What is a project like this worth to you?</div>
     <p>A full track you built yourself, ready to open in Ableton.</p>
     ${choices(PRICES, 'choices--price')}
@@ -600,26 +602,25 @@ function showReady() {
     <p class="preview-note" id="dlnote" hidden>Preview: in the live version the zip downloads here.</p>
     <p>Unzip it and double-click <b style="color:#e7e7ea">${esc(projectName())}.als</b>.</p>
     <div class="row" style="margin-top:12px"><button class="btn" id="go">Next</button></div>`,
-  () => { $('dl').onclick = () => { $('dlnote').hidden = false }; $('go').onclick = () => ask(0) })
+  () => { $('dl').onclick = () => { $('dlnote').hidden = false }; $('go').onclick = showThanks })
 }
 
-// The five questions, one per screen. The Suite question is skipped for
+// Four questions, one per screen, before the price. The Suite question is skipped for
 // somebody who already has Suite.
 const QUESTIONS = [
   { id: 'ableton', h: 'Do you have Ableton Live?', list: ['Live 12 Suite', 'Live 12 Standard', 'Live 12 Intro', 'Live Lite (came with hardware)', 'A trial', 'Live 11 or older', 'No Ableton yet'] },
   { id: 'suite', h: 'This project opens fully in Live 12 Suite. Would you buy Suite for it?', list: ['Yes', 'Maybe', 'No'], skip: () => answers.ableton === 'Live 12 Suite' },
   { id: 'level', h: 'Where are you now?', list: ['I only DJ', 'I have tried producing', 'I have finished a track'] },
   { id: 'block', h: 'What stops you from making your own track?', list: ['I don\'t know where to start', 'My sound isn\'t club-ready', 'No time', 'Something else'] },
-  { id: 'next', h: 'What would you pay for the next project like this?', list: () => [...PRICES, 'I wouldn\'t pay for it'] },
 ]
 function ask(i) {
   while (i < QUESTIONS.length && QUESTIONS[i].skip?.()) i++
-  if (i >= QUESTIONS.length) return showThanks()
+  if (i >= QUESTIONS.length) return showPrice()
   const q = QUESTIONS[i], list = typeof q.list === 'function' ? q.list() : q.list
   // No "of 5": the total changes once the first answer says Suite.
-  const n = QUESTIONS.slice(0, i + 1).filter((x) => !x.skip?.()).length, last = i === QUESTIONS.length - 1
+  const n = QUESTIONS.slice(0, i + 1).filter((x) => !x.skip?.()).length
   screen(`
-    <div class="sheet__step">${last ? 'Last question' : `Question ${n}`}</div>
+    <div class="sheet__step">${n === 1 ? 'Before you get it · Question 1' : `Question ${n}`}</div>
     <div class="sheet__h">${esc(q.h)}</div>
     ${choices(list)}`,
   () => onChoice(list, (v) => { answers[q.id] = v; ask(i + 1) }))
@@ -627,8 +628,8 @@ function ask(i) {
 
 function showThanks() {
   screen(`
-    <div class="sheet__step">Done</div>
-    <div class="sheet__h">Thank you. Open your project in Ableton.</div>
+    <div class="sheet__step">Thank you</div>
+    <div class="sheet__h">Open your project in Ableton.</div>
     <p>Tomorrow we'll email you to ask how it went.</p>
     <p>What's actually inside the track you love? Watch the <a href="https://midee.me/breakdowns?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">midee breakdowns</a>.</p>
     <div class="row">${closeBtn}</div>`)
