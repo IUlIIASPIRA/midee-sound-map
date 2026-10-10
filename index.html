@@ -478,7 +478,8 @@ function drawStage() {
   $('catchbox').hidden = !(done || (wide && stage > 0))
   if (done) $('tools').firstElementChild.after($('catchbox'))
   else $('steps').after($('catchbox'))
-  keySel.disabled = !done
+  // The key can change at any step; it stays locked only where the browser has no OGG.
+  keySel.disabled = mp4Only
   const focus = stage > 0 && !done ? LESSONS[stage - 1].zone : -1
   ZONES.forEach((z, i) => z.el.classList.toggle('z--focus', i === focus))
 }
@@ -524,6 +525,7 @@ async function swap(p) {
   busy = false
 }
 keySel.onchange = async () => {
+  if (mp4Only) { keySel.value = key; return }
   key = Number(keySel.value); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
   try {
     await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
