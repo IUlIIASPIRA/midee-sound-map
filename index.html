@@ -517,7 +517,7 @@ function drawIdeas() {
 $('catch').onclick = () => catchIdea()
 
 // ================= the take-home flow =================
-// Project → four questions → price (fake door) → email → download → thanks.
+// Project → four questions → price of the full project (fake door) → email → free demo → plugin and breakdowns.
 // The questions come before the person gets the project. The
 // price screen is the last question, so it is not asked twice.
 // Preview: everything stays in this page; see the head comment.
@@ -536,19 +536,26 @@ function choices(list, cls = '') {
 }
 function onChoice(list, fn) { box.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => fn(list[+b.dataset.i]) }) }
 
+// The demo: free, a part of the track, enough to see in Ableton how it is
+// built — one or two parts in every zone. The full project is what the price
+// question is about. Slots, not sounds: after the dice the demo has whatever
+// sits in those slots now.
+const DEMO_SLOTS = [0, 1, 2, 3, 5]            // kick, bass low, bass acid, drums, chords
+const isDemo = (p) => DEMO_SLOTS.includes(PARTS.indexOf(p))
+
 function showProject() {
   // The mix as it is now is always one of the scenes.
   catchIdea(true)
-  const on = PARTS.filter((p) => p.on)
+  const on = PARTS.filter((p) => p.on), demo = on.filter(isDemo)
   screen(`
     <div class="sheet__step">Your first Ableton project</div>
     <div class="sheet__h">${esc(projectName())}</div>
     <p>Techno · 128 BPM · ${KEYS[key - 1]} · ${on.length} parts</p>
-    <ol>${on.map((p) => `<li style="font:12px/1.5 var(--mono);overflow-wrap:anywhere">${esc(midName(p))}</li>`).join('')}</ol>
+    <ol>${on.map((p) => `<li style="font:12px/1.5 var(--mono);overflow-wrap:anywhere${isDemo(p) ? '' : ';color:var(--dim)'}">${esc(midName(p))}${isDemo(p) ? ' <small style="color:#fde047">· demo</small>' : ''}</li>`).join('')}</ol>
+    <p><b style="color:#e7e7ea">Start with the free demo:</b> the ${demo.length} parts marked demo. Open it in Ableton and see how a real track is put together: every part on its own track, MIDI you can change, every knob of the Rack.</p>
     ${IDEAS.length > 1 ? `<p>Your ideas: ${IDEAS.map((d) => `Idea ${d.n} (${KEYS[d.key - 1]})`).join(', ')}. Each one comes as its own scene, like in your midee project.</p>` : ''}
-    <p>Every part opens on its own track as MIDI with its Ableton Rack, so you can change the notes and turn every knob.</p>
     <p>Made for Ableton Live 12 Suite. No Suite yet? The free trial from Ableton opens it.</p>
-    <div class="row"><button class="btn" data-close>Back</button><button class="btn btn--go" id="go">Get it</button></div>`,
+    <div class="row"><button class="btn" data-close>Back</button><button class="btn btn--go" id="go">Get the demo</button></div>`,
   () => { $('go').onclick = () => ask(0) })
 }
 
@@ -556,30 +563,21 @@ function showPrice() {
   const list = [...PRICES, 'I wouldn\'t pay for it']
   screen(`
     <div class="sheet__step">Last question</div>
-    <div class="sheet__h">What is a project like this worth to you?</div>
-    <p>A full track you built yourself, ready to open in Ableton.</p>
+    <div class="sheet__h">What would the full project be worth to you?</div>
+    <p>All ${PARTS.length} parts of the track you built, in any key, with your ideas as scenes.</p>
     ${choices(PRICES, 'choices--price')}
     <div class="choices"><button class="btn" data-i="3">I wouldn't pay for it</button></div>`,
-  () => onChoice(list, (v) => { answers.price = v; showFree() }))
-}
-
-function showFree() {
-  screen(`
-    <div class="sheet__step">Thank you</div>
-    <div class="sheet__h">During the test, your first project is free.</div>
-    <p>Your answer helps us set a fair price later.</p>
-    <div class="row"><button class="btn btn--go" id="go">Continue</button></div>`,
-  () => { $('go').onclick = showEmail })
+  () => onChoice(list, (v) => { answers.price = v; showEmail() }))
 }
 
 function showEmail() {
   screen(`
-    <div class="sheet__step">Where should we send it?</div>
-    <div class="sheet__h">Your email</div>
-    <p>We send the project here, and one short email the next day to ask how it opened. Nothing else.</p>
+    <div class="sheet__step">Your free demo</div>
+    <div class="sheet__h">Where should we send it?</div>
+    <p>We send the demo here, and one short email the next day to ask how it opened. Nothing else.</p>
     <input class="field" id="email" type="email" autocomplete="email" placeholder="you@example.com">
     <div class="err" id="err"></div>
-    <div class="row"><button class="btn btn--go" id="go">Send me the project</button></div>
+    <div class="row"><button class="btn btn--go" id="go">Send me the demo</button></div>
     <p class="preview-note">Preview: this email is not sent or saved anywhere.</p>`,
   () => {
     const go = () => {
@@ -594,13 +592,14 @@ function showEmail() {
 }
 
 function showReady() {
+  const demo = PARTS.filter((p) => p.on && isDemo(p))
   screen(`
     <div class="sheet__step">Ready</div>
-    <div class="sheet__h">Your project is ready.</div>
-    <div class="file">⬇ ${esc(projectName())}.zip</div>
+    <div class="sheet__h">Your demo is ready.</div>
+    <div class="file">⬇ ${esc(projectName())} - demo.zip</div>
     <button class="btn btn--go" id="dl" style="width:100%">Download</button>
     <p class="preview-note" id="dlnote" hidden>Preview: in the live version the zip downloads here.</p>
-    <p>Unzip it and double-click <b style="color:#e7e7ea">${esc(projectName())}.als</b>.</p>
+    <p>Unzip it and double-click <b style="color:#e7e7ea">${esc(projectName())} - demo.als</b>. It has ${demo.length} of your ${PARTS.filter((p) => p.on).length} parts.</p>
     <div class="row" style="margin-top:12px"><button class="btn" id="go">Next</button></div>`,
   () => { $('dl').onclick = () => { $('dlnote').hidden = false }; $('go').onclick = showThanks })
 }
@@ -628,11 +627,12 @@ function ask(i) {
 
 function showThanks() {
   screen(`
-    <div class="sheet__step">Thank you</div>
-    <div class="sheet__h">Open your project in Ableton.</div>
+    <div class="sheet__step">What's next</div>
+    <div class="sheet__h">Open your demo in Ableton.</div>
     <p>Tomorrow we'll email you to ask how it went.</p>
-    <p>What's actually inside the track you love? Watch the <a href="https://midee.me/breakdowns?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">midee breakdowns</a>.</p>
-    <div class="row">${closeBtn}</div>`)
+    <a class="btn btn--inside" href="https://midee.me/?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">The midee plugin<small>every midee sound inside Ableton, in any key</small></a>
+    <a class="btn btn--inside" href="https://midee.me/breakdowns?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">What's actually inside the track you love?<small>midee breakdowns</small></a>
+    <div class="row" style="margin-top:12px">${closeBtn}</div>`)
 }
 
 $('get').onclick = showProject
