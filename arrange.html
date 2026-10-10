@@ -267,6 +267,14 @@ function drawPP() {
 }
 ctx.onstatechange = drawPP
 $('pp').onclick = togglePlay
+// Space plays and stops, like in Ableton. Not while typing; and a focused
+// button must not also take the space as a click.
+const typing = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable
+addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' || typing(e) || e.repeat) return
+  e.preventDefault(); togglePlay()
+})
+addEventListener('keyup', (e) => { if (e.code === 'Space' && !typing(e)) e.preventDefault() })
 
 // ================= Arrangement View =================
 const visBars = () => mode === 'loop' ? 16 : BARS
