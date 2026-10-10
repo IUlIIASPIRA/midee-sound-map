@@ -21,6 +21,18 @@
   .deck__tag { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: #000; background: #fde047; display: inline-block; padding: 5px 7px; }
   .deck__t { font: 600 22px/1.1 var(--mono); letter-spacing: 2px; margin: 10px 0 6px; }
   .deck__meta { display: flex; gap: 8px; align-items: center; font: 12px/1 var(--mono); letter-spacing: 1px; color: var(--dim); text-transform: uppercase; }
+  /* the key: our own list, so it opens dark like the rest of the deck (a native select opens white) */
+  .keypick { position: relative; }
+  .keypick__btn { background: #111; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font: 12px/1 var(--mono); color: #e7e7ea; cursor: pointer; }
+  .keypick__btn::after { content: ' ▾'; color: var(--dim); }
+  .keypick__btn:hover:not(:disabled), .keypick__btn[aria-expanded="true"] { border-color: #fde047; }
+  .keypick__btn:disabled { opacity: .5; cursor: default; }
+  .keypick__pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, 52px); gap: 4px; padding: 6px;
+                  background: #0b0b0d; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.6); }
+  .keypick__pop[hidden] { display: none; }
+  .keypick__pop button { background: rgba(255,255,255,.04); border: 1px solid transparent; border-radius: 6px; padding: 8px 0; font: 12px/1 var(--mono); color: #e7e7ea; cursor: pointer; text-transform: none; }
+  .keypick__pop button:hover { background: rgba(255,255,255,.1); }
+  .keypick__pop button[aria-current="true"] { background: #fde047; color: #000; }
   .deck__meta select { background: #111; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font: 12px/1 var(--mono); color: #e7e7ea; }
   .parts { display: grid; gap: 4px; margin: 14px 0 12px; }
   .part { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 6px 6px 8px; border-radius: 8px; transition: background .15s, opacity .2s; }
@@ -167,7 +179,9 @@
       <span class="deck__tag">midee composition</span>
       <div class="deck__t">AMBER</div>
       <div class="deck__meta">Techno · 128 BPM · key
-        <select id="key" aria-label="Key"></select>
+        <select id="key" aria-label="Key" hidden></select>
+        <span class="keypick"><button class="keypick__btn" id="keybtn" aria-haspopup="true" aria-expanded="false" aria-label="Key"></button>
+          <span class="keypick__pop" id="keypop" hidden></span></span>
       </div>
       <div class="parts" id="parts"></div>
     </div>
@@ -350,7 +364,7 @@ async function loadPart(p) {
   }
   if (mp4Only) {
     p.buffer = await fetchDecode(mp4Of(p))
-    keySel.disabled = true; keySel.title = 'This browser plays the parts in their own key only'
+    keySel.disabled = true; keySel.title = 'This browser plays the parts in their own key only'; if (typeof drawKey === 'function') drawKey()
   }
   p.zones = analyse(p.buffer)
 }
@@ -402,6 +416,25 @@ const $ = (id) => document.getElementById(id)
 const keySel = $('key')
 KEYS.forEach((k, i) => keySel.add(new Option(k, i + 1)))
 keySel.value = key
+// The visible key picker drives the hidden select, so every place that reads
+// or sets keySel keeps working; drawKey() mirrors it back.
+const keyBtn = $('keybtn'), keyPop = $('keypop')
+KEYS.forEach((k, i) => { const b = document.createElement('button'); b.textContent = k; b.dataset.k = i + 1; keyPop.append(b) })
+function drawKey() {
+  keyBtn.textContent = KEYS[Number(keySel.value) - 1]
+  keyBtn.disabled = keySel.disabled; keyBtn.title = keySel.title
+  keyPop.querySelectorAll('button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.k === keySel.value)))
+}
+const openKeys = (on) => { keyPop.hidden = !on; keyBtn.setAttribute('aria-expanded', String(on)); if (on) drawKey() }
+keyBtn.onclick = (e) => { e.stopPropagation(); openKeys(keyPop.hidden) }
+keyPop.onclick = (e) => {
+  const b = e.target.closest('button'); if (!b) return
+  e.stopPropagation(); openKeys(false)
+  if (b.dataset.k !== keySel.value) { keySel.value = b.dataset.k; keySel.dispatchEvent(new Event('change')) }
+}
+addEventListener('click', () => openKeys(false))
+addEventListener('keydown', (e) => { if (e.key === 'Escape') openKeys(false) })
+drawKey()
 const partsEl = $('parts')
 function drawParts() {
   partsEl.innerHTML = ''
@@ -479,7 +512,7 @@ function drawStage() {
   if (done) $('tools').firstElementChild.after($('catchbox'))
   else $('steps').after($('catchbox'))
   // The key can change at any step; it stays locked only where the browser has no OGG.
-  keySel.disabled = mp4Only
+  keySel.disabled = mp4Only; drawKey()
   const focus = stage > 0 && !done ? LESSONS[stage - 1].zone : -1
   ZONES.forEach((z, i) => z.el.classList.toggle('z--focus', i === focus))
 }
@@ -525,8 +558,8 @@ async function swap(p) {
   busy = false
 }
 keySel.onchange = async () => {
-  if (mp4Only) { keySel.value = key; return }
-  key = Number(keySel.value); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
+  if (mp4Only) { keySel.value = key; drawKey(); return }
+  key = Number(keySel.value); drawKey(); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
   try {
     await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
     if (playing) { const when = ahead(); PARTS.filter((p) => p.tonal).forEach((p) => startPart(p, when)) }
@@ -574,7 +607,7 @@ function catchIdea(quiet = false) {
 async function recallIdea(idea) {
   if (busy) return
   const keyChanged = idea.key !== key
-  key = idea.key; keySel.value = String(key)
+  key = idea.key; keySel.value = String(key); drawKey()
   // An idea saved in an earlier visit has no sound loaded yet.
   const missing = idea.parts.filter((s) => !s.buffer)
   if (missing.length) {
