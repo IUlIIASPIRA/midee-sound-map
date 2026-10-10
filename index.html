@@ -273,6 +273,20 @@ const LESSONS = [
   { add: 'Add the vocal', zone: 1, text: 'A vocal shot adds a human touch on top of the groove.' },
 ]
 let stage = 0
+// ================= counters =================
+// Aggregate counts on the bot server: the event, an optional value and the
+// link's utm_source. No id, no cookie. A failed count never blocks the page.
+const CLUB_API = 'https://bot.midee.me/club'
+const SRC = (new URLSearchParams(location.search).get('utm_source') || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24)
+function track(e, v) {
+  try {
+    const body = JSON.stringify({ e, ...(v !== undefined && { v: String(v).toLowerCase().slice(0, 20) }), ...(SRC && { src: SRC }) })
+    if (!navigator.sendBeacon?.(`${CLUB_API}/event`, new Blob([body], { type: 'text/plain' })))
+      fetch(`${CLUB_API}/event`, { method: 'POST', body, keepalive: true, headers: { 'Content-Type': 'text/plain' } }).catch(() => {})
+  } catch {}
+}
+track('open')
+let maxStage = 0
 
 // "Amber_Synth_Chords_Bm_128_Wavetable" → "Synth Chords", "by Amber · Wavetable"
 // The part's name exactly as in the midee library. A tonal part says the key
@@ -487,6 +501,7 @@ async function goTo(n) {
   else if (ctx.state !== 'running') { userPaused = false; await ctx.resume() }
   drawPlay()
   stage = Math.max(0, Math.min(PARTS.length, n))
+  if (stage > maxStage) { maxStage = stage; track('step', stage); if (stage === PARTS.length) track('full') }
   PARTS.forEach((p, i) => {
     const was = p.on; p.on = i < stage
     if (p.on && !was && i === stage - 1) p.fresh = true
@@ -529,7 +544,7 @@ function drawHandle() {
 $('next').onclick = () => goTo(stage + 1)
 $('back').onclick = () => goTo(stage - 1)
 $('back2').onclick = () => goTo(stage - 1)
-$('skip').onclick = () => goTo(PARTS.length)
+$('skip').onclick = () => { track('skip', stage); goTo(PARTS.length) }
 
 // Random: a part of the same kind from the whole library, at 128 BPM, in the key of the track.
 // The pool: ~950 library tracks across the groups, picked from the public
@@ -544,6 +559,7 @@ async function pick(group, exclude) {
 let busy = false
 async function swap(p) {
   if (busy) return
+  track('dice', p.group)
   busy = true; msg(`Finding another ${p.group.toLowerCase()}…`)
   try {
     const t = await pick(p.group, new Set(PARTS.map((x) => x.id)))
@@ -559,7 +575,7 @@ async function swap(p) {
 }
 keySel.onchange = async () => {
   if (mp4Only) { keySel.value = key; drawKey(); return }
-  key = Number(keySel.value); drawKey(); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
+  key = Number(keySel.value); drawKey(); track('key', KEYS[key - 1]); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
   try {
     await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
     if (playing) { const when = ahead(); PARTS.filter((p) => p.tonal).forEach((p) => startPart(p, when)) }
@@ -601,6 +617,7 @@ function catchIdea(quiet = false) {
   if (found) { activeIdea = found; drawIdeas(); if (!quiet) msg(`This mix is already Idea ${found.n}.`); return found }
   const idea = { n: IDEAS.length + 1, key, parts: PARTS.map(({ id, name, group, tonal, on, buffer, zones }) => ({ id, name, group, tonal, on, buffer, zones })) }
   IDEAS.push(idea); activeIdea = idea; drawIdeas(); saveIdeas()
+  if (!quiet) track('catch', idea.n)
   if (!quiet) { msg(`Caught as Idea ${idea.n}. Now roll the dice on any part, you can always come back to it.`); hintDice() }
   return idea
 }
@@ -683,18 +700,18 @@ function showPrice() {
     <p>All ${PARTS.length} parts of the track you built, in any key, with your ideas as scenes.</p>
     ${choices(PRICES, 'choices--price')}
     <div class="choices"><button class="btn" data-i="3">I wouldn't pay for it</button></div>`,
-  () => onChoice(list, (v) => { answers.price = v; showEmail() }))
+  () => onChoice(list, (v) => { answers.price = v; track('price', idx('price')); showEmail() }))
 }
 
 // Where the demo goes: the midee bot first, email for people without
 // Telegram. The bot link carries the key and the answers in its start code
 // (Telegram allows 64 characters of A–Z a–z 0–9 _ -), so the bot knows what
 // this person said without asking again. CLUB_API is the bot server's
-// endpoint for the email path; until it is live the email is not sent.
+// endpoint (set with the counters above).
 const BOT = 'https://t.me/Ableton_trainer_bot'
-const CLUB_API = null
 const idx = (id) => { const q = QUESTIONS.find((x) => x.id === id), list = q ? (typeof q.list === 'function' ? q.list() : q.list) : [...PRICES, 'I wouldn\'t pay for it'], i = list.indexOf(answers[id]); return i < 0 ? 'x' : i.toString(36) }
-const startCode = () => `fp_${key.toString(36)}${idx('ableton')}${idx('suite')}${idx('level')}${idx('style')}${idx('block')}${idx('price')}${Math.min(IDEAS.length, 9)}${styleSlug()}__club`
+const codeCore = () => `${key.toString(36)}${idx('ableton')}${idx('suite')}${idx('level')}${idx('style')}${idx('block')}${idx('price')}${Math.min(IDEAS.length, 9)}`
+const startCode = () => `fp_${codeCore()}${styleSlug()}__club`
 // A style in the person's own words rides along in the Telegram link: letters and digits only, it has 64 characters in all.
 const styleSlug = () => { const t = (answers.styleOther || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30); return t ? '_' + t : '' }
 
@@ -711,21 +728,26 @@ function showEmail() {
       <div class="row"><button class="btn btn--go" id="go">Send me the demo</button></div>
       <p>We send the demo there, and one short email the next day to ask how it opened. Nothing else.</p>
     </div>
-    ${CLUB_API ? '' : '<p class="preview-note">Preview: the bot and the email are not wired to the demo yet.</p>'}`,
+`,
   () => {
-    $('tg').onclick = () => setTimeout(() => showThanks('telegram'), 400)
+    $('tg').onclick = () => { track('tg'); setTimeout(() => showThanks('telegram'), 400) }
     $('useEmail').onclick = () => { $('emailBox').hidden = false; $('useEmail').hidden = true; $('email').focus() }
     const go = async () => {
       const v = $('email').value.trim()
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) { $('err').textContent = 'That doesn\'t look like an email.'; return }
-      if (CLUB_API) {
-        $('go').disabled = true
-        try {
-          const r = await fetch(CLUB_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: v, code: startCode(), style: answers.styleOther || undefined }) })
-          if (!r.ok) throw new Error(r.status)
-        } catch { $('go').disabled = false; $('err').textContent = 'Could not send it. Try again in a moment.'; return }
-      }
-      showReady()
+      $('go').disabled = true
+      let r
+      try {
+        r = await fetch(`${CLUB_API}/email`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: v, code: codeCore(), ...(styleSlug() && { style: styleSlug().slice(1) }) }) })
+      } catch {}
+      $('go').disabled = false
+      if (r?.ok) { track('email'); return showReady() }
+      const err = r && (await r.json().catch(() => ({}))).error
+      $('err').textContent = err === 'bad_input' ? 'That doesn\'t look like an email.'
+        : r?.status === 503 ? 'Email isn\'t open yet. Send it to your Telegram above.'
+        : r?.status === 429 ? 'Too many tries. Wait a little, or send it to your Telegram above.'
+        : 'Could not send it. Try again in a moment, or send it to your Telegram above.'
     }
     $('go').onclick = go
     $('email').onkeydown = (e) => { if (e.key === 'Enter') go() }
@@ -764,6 +786,7 @@ function ask(i) {
     ${choices(list)}`,
   () => onChoice(list, (v) => {
     answers[q.id] = v
+    track('answer', `${q.id}:${idx(q.id)}`)
     if (v !== q.other) return ask(i + 1)
     // "Something else" opens a line for the person's own words.
     box.querySelector('.choices').outerHTML = `<input class="field" id="other" maxlength="60" placeholder="Your style, in your words">
@@ -786,7 +809,7 @@ function showThanks(via = 'email') {
     <div class="row" style="margin-top:12px">${closeBtn}</div>`)
 }
 
-$('get').onclick = showProject
+$('get').onclick = () => { track('get'); showProject() }
 
 const zonesEl = $('zones')
 for (const z of ZONES) {
@@ -1067,7 +1090,7 @@ Promise.all(PARTS.map(loadPart)).then(() => {
   drawIdeas()
   msg('Amber: ten parts of one midee track, real previews from the library.')
 }).catch((e) => { $('next').textContent = 'Could not load'; $('enter').textContent = 'Could not load the club'; msg(e.message) })
-$('enter').onclick = () => { $('welcome').hidden = true; goTo(1) }
+$('enter').onclick = () => { track('enter'); $('welcome').hidden = true; goTo(1) }
 </script>
 </body>
 </html>
