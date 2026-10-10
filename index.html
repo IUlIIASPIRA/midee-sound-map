@@ -26,7 +26,7 @@
   .part { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 6px 6px 8px; border-radius: 8px; transition: background .15s, opacity .2s; }
   .part:hover { background: rgba(255,255,255,.04); }
   .part i { width: 8px; height: 22px; border-radius: 3px; transition: opacity .08s; }
-  .part__n { font-size: 14px; line-height: 1.2; overflow: hidden; }
+  .part__n { font: 12px/1.25 var(--mono); overflow-wrap: anywhere; overflow: hidden; }
   .part__n small { display: block; font: 10px/1.4 var(--mono); letter-spacing: .8px; color: var(--dim); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .part button { width: 32px; height: 28px; border-radius: 8px; border: 1px solid var(--line); background: none; cursor: pointer; font-size: 14px; line-height: 1; }
   .part button:hover { border-color: #fff; }
@@ -38,6 +38,11 @@
   .btn:hover { border-color: #fff; }
   .btn--play { background: #e7e7ea; color: #000; border-color: #e7e7ea; }
   .btn--get { background: #c4b5fd; color: #000; border-color: #c4b5fd; margin-top: 8px; width: 100%; }
+  .btn--catch { margin-top: 8px; width: 100%; border-color: #fde047; color: #fde047; }
+  .ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .ideas:empty { display: none; }
+  .idea { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: none; color: #e7e7ea; cursor: pointer; font: 11px/1 var(--mono); letter-spacing: .5px; }
+  .idea--on { border-color: #fde047; color: #fde047; }
   .btn[disabled] { opacity: .5; cursor: default; }
   .coach { margin: 2px 0 12px; padding: 12px 12px 12px 14px; border-left: 3px solid #fde047; background: rgba(253,224,71,.06); border-radius: 0 10px 10px 0; }
   .coach__step { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; }
@@ -148,6 +153,8 @@
         <button class="btn btn--play" id="play">Pause</button>
         <button class="btn" id="random">🎲 Random</button>
       </div>
+      <button class="btn btn--catch" id="catch">Catch idea</button>
+      <div class="ideas" id="ideas"></div>
       <button class="btn btn--get" id="get">Get the Ableton project</button>
     </div>
     <button class="link" id="skip">Skip to the full track</button>
@@ -217,14 +224,14 @@ const LESSONS = [
 let stage = 0
 
 // "Amber_Synth_Chords_Bm_128_Wavetable" → "Synth Chords", "by Amber · Wavetable"
-function pretty(name, group) {
-  const bits = name.replace(/_Drum_Rack$/, '_DrumRack').split('_')
-  const at = bits.findIndex((b) => b === group || b === 'Bass' || b === 'Synth' || b === 'Kick' || b === 'Drums'
-    || (group === 'Percussion' && b === 'Perc') || (group === 'Vocal' && (b === 'Vox' || b === 'Vocal')))
-  const pack = (at > 0 ? bits.slice(0, at) : bits.slice(0, 1)).join(' ')
-  const rest = bits.slice(at > 0 ? at : 1).filter((b) => !/^\d+$/.test(b) && !/^[A-G]#?m?$/.test(b))
-  const device = rest.length > 1 ? rest.pop().replace('DrumRack', 'Drum Rack') : group
-  return { title: rest.join(' ') || group, sub: `${pack} · ${device}` }
+// The part's name exactly as in the midee library. A tonal part says the key
+// it plays in, the way the site renames a sound for the key you picked
+// (renameTrackForKey: the first segment like Bm / C#m is replaced).
+function midName(p) {
+  if (!p.tonal) return p.name
+  const bits = p.name.split('_'), at = bits.findIndex((b) => /^[A-G]#?m$/.test(b))
+  if (at >= 0) bits[at] = KEYS[key - 1]
+  return bits.join('_')
 }
 
 const ZONES = [
@@ -354,13 +361,12 @@ function drawParts() {
   partsEl.innerHTML = ''
   PARTS.forEach((p, idx) => {
     if (idx > stage) return                                   // the build shows what's in, plus the next part
-    const { title, sub } = pretty(p.name, p.group)
     const row = document.createElement('div')
     row.className = `part${idx === stage ? ' part--next' : p.on ? '' : ' part--off'}${p.fresh ? ' part--new' : ''}`
-    row.innerHTML = `<i style="background:${COLORS[p.group]}"></i><div class="part__n">${title}<small>${sub}${p.tonal ? ' · ' + KEYS[key - 1] : ''}</small></div>
+    row.innerHTML = `<i style="background:${COLORS[p.group]}"></i><div class="part__n">${midName(p)}<small>${p.group}</small></div>
       <button title="Mute / unmute">${p.on ? '◉' : '○'}</button><button title="Swap for a random ${p.group.toLowerCase()} from the library">🎲</button>`
     const [mute, dice] = row.querySelectorAll('button')
-    mute.onclick = () => { p.on = !p.on; if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02); drawParts(); recompute(); drawHandle() }
+    mute.onclick = () => { p.on = !p.on; if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02); drawParts(); recompute(); drawHandle(); if (stage >= PARTS.length) drawIdeas() }
     dice.onclick = () => swap(p)
     p.fresh = false; p.bar = row.querySelector('i')
     partsEl.append(row)
@@ -370,7 +376,7 @@ const msg = (t, mud = false) => { $('msg').textContent = t; $('msg').classList.t
 
 // ---------- the build ----------
 const STAGE0 = 'Build a midee track from nothing, one part at a time. Watch the four glasses fill up and the floor wake up.'
-const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, and take it as an Ableton project.'
+const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, catch the mixes you like as ideas, and take it all as an Ableton project.'
 async function goTo(n) {
   if (!playing) { await ctx.resume(); const when = ahead(); startAt = when; playing = true; PARTS.forEach((p) => startPart(p, when)) }
   else if (ctx.state !== 'running') { userPaused = false; await ctx.resume() }
@@ -430,8 +436,8 @@ async function swap(p) {
     await loadPart(next)
     Object.assign(p, next, { fresh: true, on: true })
     if (playing) startPart(p)
-    drawParts(); recompute()
-    msg(`${pretty(p.name, p.group).title} from ${pretty(p.name, p.group).sub.split(' · ')[0]}, played in ${KEYS[key - 1]}.`)
+    drawParts(); recompute(); drawIdeas()
+    msg(`${midName(p)} is in${p.tonal ? `, played in ${KEYS[key - 1]}` : ''}.`)
   } catch (e) { msg(`Could not swap: ${e.message}`) }
   busy = false
 }
@@ -445,7 +451,7 @@ keySel.onchange = async () => {
   try {
     await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
     if (playing) { const when = ahead(); PARTS.filter((p) => p.tonal).forEach((p) => startPart(p, when)) }
-    drawParts(); recompute(); msg(`Now in ${KEYS[key - 1]}. Drums stay as they are, everything with notes moved.`)
+    drawParts(); recompute(); drawIdeas(); msg(`Now in ${KEYS[key - 1]}. Drums stay as they are, everything with notes moved.`)
   } catch (e) { msg(`Could not change key: ${e.message}`) }
   busy = false
 }
@@ -469,10 +475,45 @@ $('pp').onclick = togglePlay
 addEventListener('pointerdown', (e) => {
   if (playing && !userPaused && ctx.state !== 'running' && !e.target.closest('#pp, #play')) ctx.resume()
 })
+// ================= Catch idea =================
+// Saves the mix as it is now — which parts, which are muted, the key — as a
+// scene, like scenes in a midee project. Tap a scene to go back to it. In the
+// live version each idea becomes a scene of the person's midee project.
+const IDEAS = []
+let activeIdea = null
+const sameAsNow = (idea) => idea.key === key && idea.parts.every((s, i) => s.id === PARTS[i].id && s.on === PARTS[i].on)
+function catchIdea(quiet = false) {
+  const found = IDEAS.find(sameAsNow)
+  if (found) { activeIdea = found; drawIdeas(); if (!quiet) msg(`This mix is already Idea ${found.n}.`); return found }
+  const idea = { n: IDEAS.length + 1, key, parts: PARTS.map(({ id, name, group, tonal, on, buffer, zones }) => ({ id, name, group, tonal, on, buffer, zones })) }
+  IDEAS.push(idea); activeIdea = idea; drawIdeas()
+  if (!quiet) msg(`Caught as Idea ${idea.n}. Keep changing things, you can always come back to it.`)
+  return idea
+}
+async function recallIdea(idea) {
+  if (busy) return
+  const keyChanged = idea.key !== key, when = ahead()
+  key = idea.key; keySel.value = String(key)
+  idea.parts.forEach((s, i) => {
+    const p = PARTS[i], changed = p.id !== s.id || (s.tonal && keyChanged)
+    Object.assign(p, s)
+    if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02)
+    if (changed && playing) startPart(p, when)
+  })
+  activeIdea = idea
+  drawParts(); recompute(); drawHandle(); drawIdeas(); msg(`Back to Idea ${idea.n}.`)
+}
+function drawIdeas() {
+  if (activeIdea && !sameAsNow(activeIdea)) activeIdea = null
+  $('ideas').innerHTML = IDEAS.map((d) => `<button class="idea${d === activeIdea ? ' idea--on' : ''}" data-n="${d.n}">Idea ${d.n} · ${KEYS[d.key - 1]}</button>`).join('')
+  $('ideas').querySelectorAll('[data-n]').forEach((b) => { b.onclick = () => recallIdea(IDEAS[+b.dataset.n - 1]) })
+}
+$('catch').onclick = () => catchIdea()
+
 // ================= the take-home flow =================
 // Project → price (fake door) → email → download → five questions → thanks.
 // Preview: everything stays in this page; see the head comment.
-const PRICES = ['€5', '€10', '€20']            // placeholders until Julie names three
+const PRICES = ['€5', '€10', '€20']            // placeholders
 const answers = {}
 const box = $('sheetBox')
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
@@ -488,12 +529,15 @@ function choices(list, cls = '') {
 function onChoice(list, fn) { box.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => fn(list[+b.dataset.i]) }) }
 
 function showProject() {
+  // The mix as it is now is always one of the scenes.
+  catchIdea(true)
   const on = PARTS.filter((p) => p.on)
   screen(`
     <div class="sheet__step">Your project</div>
     <div class="sheet__h">${esc(projectName())}</div>
     <p>Techno · 128 BPM · ${KEYS[key - 1]} · ${on.length} parts</p>
-    <ol>${on.map((p) => { const n = pretty(p.name, p.group); return `<li>${esc(n.title)} <small>${esc(n.sub)}</small></li>` }).join('')}</ol>
+    <ol>${on.map((p) => `<li style="font:12px/1.5 var(--mono);overflow-wrap:anywhere">${esc(midName(p))}</li>`).join('')}</ol>
+    ${IDEAS.length > 1 ? `<p>Your ideas: ${IDEAS.map((d) => `Idea ${d.n} (${KEYS[d.key - 1]})`).join(', ')}. Each one comes as its own scene, like in your midee project.</p>` : ''}
     <p>Every part opens on its own track as MIDI with its Ableton Rack, so you can change the notes and turn every knob.</p>
     <p>Made for Ableton Live 12 Suite. No Suite yet? The free trial from Ableton opens it.</p>
     <div class="row"><button class="btn" data-close>Back</button><button class="btn btn--go" id="go">Get it</button></div>`,
