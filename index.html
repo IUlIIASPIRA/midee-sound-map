@@ -35,6 +35,11 @@
   .part button:hover { border-color: #fff; }
   .part--off { opacity: .4; }
   .part--new { animation: flash 1.2s ease-out; }
+  /* the end on a phone: the parts open up and the dice ask to be rolled */
+  .hint { animation: hint 1.1s ease-in-out 3; }
+  @keyframes hint { 0%, 100% { box-shadow: 0 0 0 0 rgba(253,224,71,0); } 50% { box-shadow: 0 0 0 4px rgba(253,224,71,.55); border-color: #fde047; } }
+  .deck--reveal .deck__more { animation: reveal .7s ease-out; }
+  @keyframes reveal { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
   @keyframes flash { 0% { background: rgba(253,224,71,.25); } 100% { background: transparent; } }
   .row { display: flex; gap: 8px; }
   .btn { flex: 1; padding: 12px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.05); cursor: pointer; font: 600 12px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; }
@@ -75,7 +80,7 @@
   .z--mud .z__fill { filter: saturate(.25) blur(1.2px); }
   .z--mud .z__spill { opacity: 1; height: 24px; }
   .z__t { font: 600 12px/1 var(--mono); letter-spacing: 1.5px; margin-top: 10px; }
-  .z__s { font-size: 12px; line-height: 1.3; color: var(--dim); margin-top: 4px; min-height: 32px; }
+  .z__s { font-size: 12px; line-height: 1.3; color: var(--dim); margin-top: 4px; height: 48px; overflow: hidden; }
   .z__s em { font-style: normal; color: #e7e7ea; }
 
   /* the Ableton project sheet */
@@ -175,14 +180,16 @@
       <button class="btn btn--ghost" id="pp" hidden aria-label="Pause">❚❚</button>
       <button class="btn btn--next" id="next" disabled>Loading…</button>
     </div>
+    <div id="catchbox" hidden>
+      <button class="btn btn--catch" id="catch">Catch idea</button>
+      <div class="ideas" id="ideas"></div>
+    </div>
     <div id="tools" hidden>
       <div class="row">
         <button class="btn btn--ghost" id="back2" aria-label="Back">←</button>
         <button class="btn btn--play" id="play">Pause</button>
         <button class="btn" id="random">🎲 Random</button>
       </div>
-      <button class="btn btn--catch" id="catch">Catch idea</button>
-      <div class="ideas" id="ideas"></div>
       <button class="btn btn--get" id="get">Get your first Ableton project</button>
       <a class="btn btn--inside" href="https://midee.me/breakdowns?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">What's actually inside the track you love?<small>midee breakdowns</small></a>
     </div>
@@ -419,6 +426,23 @@ const msg = (t, mud = false) => { $('msg').textContent = t; $('msg').classList.t
 // ---------- the build ----------
 const STAGE0 = 'Build a midee track from nothing, one part at a time. Watch the four glasses fill up and the floor wake up.'
 const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, catch the mixes you like as ideas, and take it all as your first Ableton project.'
+// On a phone the deck is folded. When the last part is in, it opens by itself
+// and the dice light up: this is where the track becomes yours. Once.
+let revealed = false
+function revealEnd() {
+  if (revealed || matchMedia('(min-width: 901px)').matches) return
+  revealed = true
+  const deck = $('deck')
+  deck.classList.remove('deck--min'); deck.classList.add('deck--reveal')
+  $('handle').setAttribute('aria-expanded', 'true'); drawHandle()
+  setTimeout(() => {
+    const dice = [$('random'), ...partsEl.querySelectorAll('.part button:last-child')]
+    dice.forEach((b) => { b.classList.remove('hint'); void b.offsetWidth; b.classList.add('hint') })
+    $('random').scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    msg('Now make it yours: roll the dice to swap a part for another sound from the library.')
+  }, 500)
+  setTimeout(() => deck.classList.remove('deck--reveal'), 900)
+}
 async function goTo(n) {
   if (!playing) { await ctx.resume(); const when = ahead(); startAt = when; playing = true; PARTS.forEach((p) => startPart(p, when)) }
   else if (ctx.state !== 'running') { userPaused = false; await ctx.resume() }
@@ -430,6 +454,7 @@ async function goTo(n) {
     p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02)
   })
   drawStage(); drawParts(); recompute()
+  if (stage >= PARTS.length) revealEnd()
 }
 function drawStage() {
   drawHandle()
@@ -441,6 +466,12 @@ function drawStage() {
   // At the end the steps row (← ▶) gives way to one row: ← Play Random.
   $('steps').hidden = done
   $('tools').hidden = !done; $('skip').hidden = done
+  // Catch idea: on a computer from the first part on; on a phone at the end,
+  // under ← Play Random, where there is room for it.
+  const wide = matchMedia('(min-width: 901px)').matches
+  $('catchbox').hidden = !(done || (wide && stage > 0))
+  if (done) $('tools').firstElementChild.after($('catchbox'))
+  else $('steps').after($('catchbox'))
   keySel.disabled = !done
   const focus = stage > 0 && !done ? LESSONS[stage - 1].zone : -1
   ZONES.forEach((z, i) => z.el.classList.toggle('z--focus', i === focus))
