@@ -54,7 +54,8 @@
   /* the end, one step at a time: catch an idea, roll the dice, take the project */
   .hint--on { animation: hint 1.1s ease-in-out infinite; }
   .tip { position: fixed; z-index: 7; max-width: 240px; padding: 9px 11px; border-radius: 10px; background: #fde047; color: #000;
-         font: 600 12px/1.35 'DM Sans', system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; transition: opacity .2s; }
+         font: 600 12px/1.35 'DM Sans', system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.5); cursor: pointer; transition: opacity .2s; }
+  .tip em { display: block; margin-top: 5px; font: 600 10px/1 var(--mono); font-style: normal; letter-spacing: 1px; opacity: .55; }
   .tip small { display: block; font: 600 10px/1 var(--mono); letter-spacing: 1.2px; margin-bottom: 4px; opacity: .6; }
   .tip::after { content: ''; position: absolute; left: var(--ax, 50%); bottom: -6px; width: 12px; height: 12px; margin-left: -6px; background: #fde047; transform: rotate(45deg); }
   .tip--below::after { bottom: auto; top: -6px; }
@@ -516,7 +517,7 @@ function placeTip() {
   if (!el) { tip.hidden = true; return }
   const r = el.getBoundingClientRect(), box = $('deck').getBoundingClientRect()
   // hidden while the button is scrolled out of the deck or the deck is folded / covered
-  const seen = r.height && r.bottom > box.top + 4 && r.top < box.bottom - 4 && getComputedStyle($('deck')).visibility !== 'hidden'
+  const seen = $('sheet').hidden && r.height && r.bottom > box.top + 4 && r.top < box.bottom - 4 && getComputedStyle($('deck')).visibility !== 'hidden'
   tip.hidden = !seen
   if (!seen) return
   const w = tip.offsetWidth, h = tip.offsetHeight, cx = r.left + r.width / 2
@@ -531,7 +532,7 @@ function setTip(step) {
   tipStep = step
   cancelAnimationFrame(tipLoop)
   if (!step) { $('tip').hidden = true; lightTip(); return }
-  $('tip').innerHTML = `<small>${TIPS[step][0]}</small>${TIPS[step][1]}`
+  $('tip').innerHTML = `<small>${TIPS[step][0]}</small>${TIPS[step][1]}<em>${step === 'get' ? 'tap to close' : 'tap to skip'}</em>`
   lightTip()
   const el = tipTarget()
   if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -548,6 +549,7 @@ const tipDone = (step) => {
   const next = ORDER[ORDER.indexOf(step) + 1] || null
   setTip(next === 'dice' && rolled ? 'get' : next)
 }
+$('tip').onclick = (e) => { e.stopPropagation(); tipDone(tipStep) }
 function hintCatch() {
   msg('Catch this mix as an idea first, so you never lose it. Then roll the dice on any part.')
   setTip('catch')
@@ -690,7 +692,7 @@ let activeIdea = null
 const sameAsNow = (idea) => idea.key === key && idea.parts.every((s, i) => s.id === PARTS[i].id && s.on === PARTS[i].on)
 function catchIdea(quiet = false) {
   const found = IDEAS.find(sameAsNow)
-  if (found) { activeIdea = found; drawIdeas(); if (!quiet) msg(`This mix is already Idea ${found.n}.`); return found }
+  if (found) { activeIdea = found; drawIdeas(); if (!quiet) { msg(`This mix is already Idea ${found.n}.`); tipDone('catch') } return found }
   const idea = { n: IDEAS.length + 1, key, parts: PARTS.map(({ id, name, group, tonal, on, buffer, zones }) => ({ id, name, group, tonal, on, buffer, zones })) }
   IDEAS.push(idea); activeIdea = idea; drawIdeas(); saveIdeas()
   if (!quiet) track('catch', idea.n)
