@@ -51,6 +51,13 @@
   .hint { animation: hint 1.1s ease-in-out 3; }
   @keyframes hint { 0%, 100% { box-shadow: 0 0 0 0 rgba(253,224,71,0); } 50% { box-shadow: 0 0 0 4px rgba(253,224,71,.55); border-color: #fde047; } }
   .deck--reveal .deck__more { animation: reveal .7s ease-out; }
+  /* the end, one step at a time: catch an idea, roll the dice, take the project */
+  .hint--on { animation: hint 1.1s ease-in-out infinite; }
+  .tip { position: fixed; z-index: 7; max-width: 240px; padding: 9px 11px; border-radius: 10px; background: #fde047; color: #000;
+         font: 600 12px/1.35 'DM Sans', system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; transition: opacity .2s; }
+  .tip small { display: block; font: 600 10px/1 var(--mono); letter-spacing: 1.2px; margin-bottom: 4px; opacity: .6; }
+  .tip::after { content: ''; position: absolute; left: var(--ax, 50%); bottom: -6px; width: 12px; height: 12px; margin-left: -6px; background: #fde047; transform: rotate(45deg); }
+  .tip--below::after { bottom: auto; top: -6px; }
   @keyframes reveal { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
   @keyframes flash { 0% { background: rgba(253,224,71,.25); } 100% { background: transparent; } }
   .row { display: flex; gap: 8px; }
@@ -212,6 +219,7 @@
     <button class="link" id="skip">Skip to the full track</button>
     <div class="msg" id="msg"></div>
   </div>
+  <div class="tip" id="tip" hidden></div>
 
   <div class="zones" id="zones"></div>
 
@@ -468,6 +476,7 @@ function drawParts() {
     p.fresh = false; p.bar = row.querySelector('i')
     partsEl.append(row)
   })
+  if (tipStep === 'dice') lightTip()
 }
 const msg = (t, mud = false) => { $('msg').textContent = t; $('msg').classList.toggle('msg--mud', mud) }
 
@@ -481,19 +490,67 @@ let revealed = false
 // Called after any scrollIntoView, so it wins over a nearer scroll still in progress.
 const toDeckEnd = () => { if (!matchMedia('(min-width: 901px)').matches) setTimeout(() => $('deck').scrollTo({ top: $('deck').scrollHeight, behavior: 'smooth' }), 60) }
 function hint(els) { els.forEach((b) => { b.classList.remove('hint'); void b.offsetWidth; b.classList.add('hint') }) }
-// First keep what you have, then change it: Catch idea lights up, and the
-// dice only after the first idea is caught.
-function hintCatch() {
-  hint([$('catch')]); $('catch').scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  msg('Catch this mix as an idea first, so you never lose it. Then roll the dice on any part.')
+// The end, one step at a time, each with a popup next to its button:
+// 1 catch the mix as an idea, 2 roll the dice on a part, 3 take the project.
+// A step moves on only when its action is done; the project button ends it.
+const TIPS = {
+  catch: ['Step 1 of 3', 'Catch this mix as an idea so you never lose it.'],
+  dice: ['Step 2 of 3', 'Roll the dice on any part to hear another sound from the library.'],
+  get: ['Step 3 of 3', 'Take your ideas home as your first Ableton project.'],
 }
-let diceHinted = false
-function hintDice() {
-  if (diceHinted) return
-  diceHinted = true
-  // the dice, and the way out: the project button lights up with them
-  hint([...partsEl.querySelectorAll('.part button:last-child'), $('get')])
-  toDeckEnd()
+let tipStep = null
+// the dice: the first one in view, not one hidden under the deck's sticky handle on a phone
+function firstDice() {
+  const all = [...partsEl.querySelectorAll('.part button:last-child')].filter((b) => b.offsetParent)
+  const h = $('handle'), top = h && h.offsetParent ? h.getBoundingClientRect().bottom : $('deck').getBoundingClientRect().top
+  return all.find((b) => b.getBoundingClientRect().top >= top - 2) || all[0]
+}
+const tipTarget = () => tipStep === 'dice' ? firstDice() : tipStep && $(tipStep)
+function lightTip() {
+  document.querySelectorAll('.hint--on').forEach((b) => b.classList.remove('hint--on'))
+  if (tipStep === 'dice') partsEl.querySelectorAll('.part button:last-child').forEach((b) => b.classList.add('hint--on'))
+  else if (tipStep) $(tipStep).classList.add('hint--on')
+}
+function placeTip() {
+  const tip = $('tip'), el = tipTarget()
+  if (!el) { tip.hidden = true; return }
+  const r = el.getBoundingClientRect(), box = $('deck').getBoundingClientRect()
+  // hidden while the button is scrolled out of the deck or the deck is folded / covered
+  const seen = r.height && r.bottom > box.top + 4 && r.top < box.bottom - 4 && getComputedStyle($('deck')).visibility !== 'hidden'
+  tip.hidden = !seen
+  if (!seen) return
+  const w = tip.offsetWidth, h = tip.offsetHeight, cx = r.left + r.width / 2
+  const left = Math.max(8, Math.min(innerWidth - w - 8, cx - w / 2))
+  const below = r.top - h - 12 < 8
+  tip.classList.toggle('tip--below', below)
+  tip.style.left = left + 'px'; tip.style.top = (below ? r.bottom + 12 : r.top - h - 12) + 'px'
+  tip.style.setProperty('--ax', Math.max(14, Math.min(w - 14, cx - left)) + 'px')
+}
+let tipLoop = 0
+function setTip(step) {
+  tipStep = step
+  cancelAnimationFrame(tipLoop)
+  if (!step) { $('tip').hidden = true; lightTip(); return }
+  $('tip').innerHTML = `<small>${TIPS[step][0]}</small>${TIPS[step][1]}`
+  lightTip()
+  const el = tipTarget()
+  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  if (step === 'get') toDeckEnd()
+  const loop = () => { placeTip(); tipLoop = requestAnimationFrame(loop) }
+  loop()
+}
+// steps only go forward: catching after a dice roll goes straight to the project
+const ORDER = ['catch', 'dice', 'get']
+let rolled = false
+const tipDone = (step) => {
+  if (step === 'dice') rolled = true
+  if (tipStep !== step) return
+  const next = ORDER[ORDER.indexOf(step) + 1] || null
+  setTip(next === 'dice' && rolled ? 'get' : next)
+}
+function hintCatch() {
+  msg('Catch this mix as an idea first, so you never lose it. Then roll the dice on any part.')
+  setTip('catch')
 }
 function revealEnd() {
   if (revealed) return
@@ -580,6 +637,7 @@ async function swap(p) {
     if (playing) startPart(p)
     drawParts(); recompute(); drawIdeas()
     msg(`${midName(p)} is in${p.tonal ? `, played in ${KEYS[key - 1]}` : ''}.`)
+    tipDone('dice')
   } catch (e) { msg(`Could not swap: ${e.message}`) }
   busy = false
 }
@@ -636,7 +694,7 @@ function catchIdea(quiet = false) {
   const idea = { n: IDEAS.length + 1, key, parts: PARTS.map(({ id, name, group, tonal, on, buffer, zones }) => ({ id, name, group, tonal, on, buffer, zones })) }
   IDEAS.push(idea); activeIdea = idea; drawIdeas(); saveIdeas()
   if (!quiet) track('catch', idea.n)
-  if (!quiet) { msg(`Caught as Idea ${idea.n}. Now roll the dice on any part, you can always come back to it.`); hintDice() }
+  if (!quiet) { msg(`Caught as Idea ${idea.n}. Now roll the dice on any part, you can always come back to it.`); tipDone('catch') }
   return idea
 }
 async function recallIdea(idea) {
@@ -827,7 +885,7 @@ function showThanks(via = 'email') {
     <div class="row" style="margin-top:12px">${closeBtn}</div>`)
 }
 
-$('get').onclick = () => { track('get'); showProject() }
+$('get').onclick = () => { track('get'); setTip(null); showProject() }
 
 const zonesEl = $('zones')
 for (const z of ZONES) {
