@@ -274,17 +274,25 @@ async function loadPart(p) {
   }
   p.zones = analyse(p.buffer)
 }
-// Start (or restart) one part in step with the others.
-function startPart(p) {
-  if (p.src) { try { p.src.stop() } catch {} p.src.disconnect() }
+// Start (or restart) one part in step with the others, at a moment far enough
+// ahead that a busy phone still makes it: a start that arrives late plays from
+// the planned point anyway, and that part ends up behind the rest (this is
+// what desynced the melodic parts after a key change on a phone, 10.10).
+// The old sound keeps playing until that same moment, so the switch is seamless.
+const LEAD = 0.25, BAR = 4 * 60 / BPM
+const ahead = () => ctx.currentTime + LEAD
+function startPart(p, when = ahead()) {
+  if (p.src) { const old = p.src; old.onended = () => old.disconnect(); try { old.stop(when) } catch { old.disconnect() } }
   if (!p.gain) { p.gain = ctx.createGain(); p.gain.connect(master) }
   p.gain.gain.value = p.on ? 1 : 0
   const src = ctx.createBufferSource(); src.buffer = p.buffer; src.loop = true; src.connect(p.gain)
-  const now = ctx.currentTime + 0.03
-  const offset = ((now - startAt) % p.buffer.duration + p.buffer.duration) % p.buffer.duration
-  src.start(now, offset); p.src = src
+  // loop on whole bars, so a preview a few samples long or short never drifts
+  const bars = Math.max(1, Math.round(p.buffer.duration / BAR)), len = Math.min(bars * BAR, p.buffer.duration)
+  src.loopStart = 0; src.loopEnd = len
+  const offset = ((when - startAt) % len + len) % len
+  src.start(when, offset); p.src = src
 }
-const playStep = () => playing && ctx.state === 'running' ? Math.floor((ctx.currentTime - startAt) / STEP) : -1
+const playStep = () => playing && ctx.state === 'running' && ctx.currentTime >= startAt ? Math.floor((ctx.currentTime - startAt) / STEP) : -1
 
 // ================= the mix: zones and mud =================
 let REF = 1, mix = null
@@ -336,7 +344,7 @@ const msg = (t, mud = false) => { $('msg').textContent = t; $('msg').classList.t
 const STAGE0 = 'Build a midee track from nothing, one part at a time. Watch the four glasses fill up and the floor wake up.'
 const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, and take it as an Ableton project.'
 async function goTo(n) {
-  if (!playing) { await ctx.resume(); startAt = ctx.currentTime + 0.05; playing = true; PARTS.forEach(startPart) }
+  if (!playing) { await ctx.resume(); const when = ahead(); startAt = when; playing = true; PARTS.forEach((p) => startPart(p, when)) }
   else if (ctx.state !== 'running') { userPaused = false; await ctx.resume() }
   drawPlay()
   stage = Math.max(0, Math.min(PARTS.length, n))
@@ -408,7 +416,7 @@ keySel.onchange = async () => {
   key = Number(keySel.value); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
   try {
     await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
-    if (playing) PARTS.filter((p) => p.tonal).forEach(startPart)
+    if (playing) { const when = ahead(); PARTS.filter((p) => p.tonal).forEach((p) => startPart(p, when)) }
     drawParts(); recompute(); msg(`Now in ${KEYS[key - 1]}. Drums stay as they are, everything with notes moved.`)
   } catch (e) { msg(`Could not change key: ${e.message}`) }
   busy = false
