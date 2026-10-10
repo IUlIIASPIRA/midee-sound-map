@@ -85,13 +85,14 @@
   .note { position: fixed; left: 50%; top: 20px; transform: translateX(-50%); font: 10px/1 var(--mono); letter-spacing: 1px; color: #55555c; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
   [hidden] { display: none !important; }
 
-  /* welcome */
-  .welcome { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 60%, rgba(236,72,153,.18), rgba(0,0,0,.92) 60%); z-index: 5; }
-  .welcome__box { width: min(520px, calc(100vw - 40px)); }
-  .welcome__h { font: 600 30px/1.12 var(--mono); letter-spacing: .5px; margin: 16px 0 14px; }
-  .welcome p { color: #c9c9cf; font-size: 16px; line-height: 1.5; margin: 0 0 10px; }
-  .welcome small { display: block; color: var(--dim); font: 11px/1.4 var(--mono); letter-spacing: 1px; text-transform: uppercase; margin: 16px 0 18px; }
-  .welcome .btn { width: 100%; padding: 16px; font-size: 13px; background: #fde047; color: #000; border-color: #fde047; }
+  /* welcome — the same panel, coach box and colours as the deck inside */
+  .welcome { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); z-index: 5; }
+  .welcome__box { width: min(500px, calc(100vw - 32px)); box-sizing: border-box; padding: 18px; border-radius: 12px; border: 1px solid var(--line); background: rgba(0,0,0,.6); backdrop-filter: blur(8px); }
+  .welcome__h { font: 600 24px/1.15 var(--mono); letter-spacing: 1px; margin: 14px 0 14px; }
+  .welcome .coach { margin: 0 0 14px; }
+  .welcome .coach__t + .coach__t { margin-top: 10px; }
+  .welcome .coach__step { margin: 0 0 14px; }
+  .welcome .btn { width: 100%; padding: 14px; }
 
   /* the flow inside the sheet */
   .sheet { z-index: 6; }
@@ -170,10 +171,12 @@
     <div class="welcome__box">
       <span class="deck__tag">midee club</span>
       <div class="welcome__h">Build a techno track.<br>Take it home as your Ableton project.</div>
-      <p>Ten parts of a real track, added one by one. Each time you hear the new part land in the club and see which part of the sound it fills.</p>
-      <p>At the end you change the key, roll the dice on the parts, and download the whole track as a project you can open in Ableton.</p>
-      <small>About 5 minutes · turn the sound on</small>
-      <button class="btn" id="enter" disabled>Loading the club…</button>
+      <div class="coach">
+        <p class="coach__t">Ten parts of a real track, added one by one. Each time you hear the new part land in the club and see which part of the sound it fills.</p>
+        <p class="coach__t">At the end you change the key, roll the dice on the parts, and download the whole track as a project you can open in Ableton.</p>
+      </div>
+      <div class="coach__step">About 5 minutes · turn the sound on</div>
+      <button class="btn btn--next" id="enter" disabled>Loading the club…</button>
     </div>
   </div>
 
