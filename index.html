@@ -188,7 +188,6 @@
       <div class="row">
         <button class="btn btn--ghost" id="back2" aria-label="Back">←</button>
         <button class="btn btn--play" id="play">Pause</button>
-        <button class="btn" id="random">🎲 Random</button>
       </div>
       <button class="btn btn--get" id="get">Get your first Ableton project</button>
     </div>
@@ -427,18 +426,27 @@ const FINAL = 'That is a full track. Every glass is filled and nothing fights in
 // On a phone the deck is folded. When the last part is in, it opens by itself
 // and the dice light up: this is where the track becomes yours. Once.
 let revealed = false
+function hint(els) { els.forEach((b) => { b.classList.remove('hint'); void b.offsetWidth; b.classList.add('hint') }) }
+// First keep what you have, then change it: Catch idea lights up, and the
+// dice only after the first idea is caught.
+function hintCatch() {
+  hint([$('catch')]); $('catch').scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  msg('Catch this mix as an idea first, so you never lose it. Then roll the dice on any part.')
+}
+let diceHinted = false
+function hintDice() {
+  if (diceHinted) return
+  diceHinted = true
+  hint([...partsEl.querySelectorAll('.part button:last-child')])
+}
 function revealEnd() {
-  if (revealed || matchMedia('(min-width: 901px)').matches) return
+  if (revealed) return
   revealed = true
+  if (matchMedia('(min-width: 901px)').matches) { setTimeout(hintCatch, 300); return }
   const deck = $('deck')
   deck.classList.remove('deck--min'); deck.classList.add('deck--reveal')
   $('handle').setAttribute('aria-expanded', 'true'); drawHandle()
-  setTimeout(() => {
-    const dice = [$('random'), ...partsEl.querySelectorAll('.part button:last-child')]
-    dice.forEach((b) => { b.classList.remove('hint'); void b.offsetWidth; b.classList.add('hint') })
-    $('random').scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-    msg('Now make it yours: roll the dice to swap a part for another sound from the library.')
-  }, 500)
+  setTimeout(hintCatch, 500)
   setTimeout(() => deck.classList.remove('deck--reveal'), 900)
 }
 async function goTo(n) {
@@ -515,11 +523,6 @@ async function swap(p) {
   } catch (e) { msg(`Could not swap: ${e.message}`) }
   busy = false
 }
-$('random').onclick = async () => {
-  // swap three parts at once, never the kick, so the groove keeps its anchor
-  const pool = PARTS.filter((p) => p.group !== 'Kick').sort(() => Math.random() - 0.5).slice(0, 3)
-  for (const p of pool) await swap(p)
-}
 keySel.onchange = async () => {
   key = Number(keySel.value); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
   try {
@@ -553,21 +556,31 @@ addEventListener('pointerdown', (e) => {
 // Saves the mix as it is now — which parts, which are muted, the key — as a
 // scene, like scenes in a midee project. Tap a scene to go back to it. In the
 // live version each idea becomes a scene of the person's midee project.
-const IDEAS = []
+const STORE = 'midee-club-ideas-v1'
+const IDEAS = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || [] } catch { return [] } })()
+const saveIdeas = () => { try { localStorage.setItem(STORE, JSON.stringify(IDEAS.map(({ n, key, parts }) => ({ n, key, parts: parts.map(({ id, name, group, tonal, on }) => ({ id, name, group, tonal, on })) })))) } catch {} }
 let activeIdea = null
 const sameAsNow = (idea) => idea.key === key && idea.parts.every((s, i) => s.id === PARTS[i].id && s.on === PARTS[i].on)
 function catchIdea(quiet = false) {
   const found = IDEAS.find(sameAsNow)
   if (found) { activeIdea = found; drawIdeas(); if (!quiet) msg(`This mix is already Idea ${found.n}.`); return found }
   const idea = { n: IDEAS.length + 1, key, parts: PARTS.map(({ id, name, group, tonal, on, buffer, zones }) => ({ id, name, group, tonal, on, buffer, zones })) }
-  IDEAS.push(idea); activeIdea = idea; drawIdeas()
-  if (!quiet) msg(`Caught as Idea ${idea.n}. Keep changing things, you can always come back to it.`)
+  IDEAS.push(idea); activeIdea = idea; drawIdeas(); saveIdeas()
+  if (!quiet) { msg(`Caught as Idea ${idea.n}. Now roll the dice on any part, you can always come back to it.`); hintDice() }
   return idea
 }
 async function recallIdea(idea) {
   if (busy) return
-  const keyChanged = idea.key !== key, when = ahead()
+  const keyChanged = idea.key !== key
   key = idea.key; keySel.value = String(key)
+  // An idea saved in an earlier visit has no sound loaded yet.
+  const missing = idea.parts.filter((s) => !s.buffer)
+  if (missing.length) {
+    busy = true; msg(`Loading Idea ${idea.n}…`)
+    try { await Promise.all(missing.map(loadPart)) } catch (e) { busy = false; msg(`Could not load Idea ${idea.n}: ${e.message}`); return }
+    busy = false
+  }
+  const when = ahead()
   idea.parts.forEach((s, i) => {
     const p = PARTS[i], changed = p.id !== s.id || (s.tonal && keyChanged)
     Object.assign(p, s)
@@ -585,7 +598,7 @@ function drawIdeas() {
 $('catch').onclick = () => catchIdea()
 
 // ================= the take-home flow =================
-// Project → four questions → price of the full project (fake door) → email → free demo → plugin and breakdowns.
+// Project → four questions → price of the full project (fake door) → Telegram bot or email → free demo → plugin and breakdowns.
 // The questions come before the person gets the project. The
 // price screen is the last question, so it is not asked twice.
 // Preview: everything stays in this page; see the head comment.
@@ -638,24 +651,47 @@ function showPrice() {
   () => onChoice(list, (v) => { answers.price = v; showEmail() }))
 }
 
+// Where the demo goes: the midee bot first, email for people without
+// Telegram. The bot link carries the key and the answers in its start code
+// (Telegram allows 64 characters of A–Z a–z 0–9 _ -), so the bot knows what
+// this person said without asking again. CLUB_API is the bot server's
+// endpoint for the email path; until it is live the email is not sent.
+const BOT = 'https://t.me/Ableton_trainer_bot'
+const CLUB_API = null
+const idx = (id) => { const q = QUESTIONS.find((x) => x.id === id), list = q ? (typeof q.list === 'function' ? q.list() : q.list) : [...PRICES, 'I wouldn\'t pay for it'], i = list.indexOf(answers[id]); return i < 0 ? 'x' : i.toString(36) }
+const startCode = () => `fp_${key.toString(36)}${idx('ableton')}${idx('suite')}${idx('level')}${idx('block')}${idx('price')}${Math.min(IDEAS.length, 9)}__club`
+
 function showEmail() {
   screen(`
     <div class="sheet__step">Your free demo</div>
     <div class="sheet__h">Where should we send it?</div>
-    <p>We send the demo here, and one short email the next day to ask how it opened. Nothing else.</p>
-    <input class="field" id="email" type="email" autocomplete="email" placeholder="you@example.com">
-    <div class="err" id="err"></div>
-    <div class="row"><button class="btn btn--go" id="go">Send me the demo</button></div>
-    <p class="preview-note">Preview: this email is not sent or saved anywhere.</p>`,
+    <p>The midee bot sends you the demo in Telegram, and you can ask it anything about your track.</p>
+    <a class="btn btn--go" id="tg" href="${BOT}?start=${startCode()}" target="_blank" rel="noopener" style="display:block;width:100%;box-sizing:border-box;text-decoration:none">Send it to my Telegram</a>
+    <button class="link" id="useEmail" style="margin-top:14px">No Telegram? Use email</button>
+    <div id="emailBox" hidden>
+      <input class="field" id="email" type="email" autocomplete="email" placeholder="you@example.com">
+      <div class="err" id="err"></div>
+      <div class="row"><button class="btn btn--go" id="go">Send me the demo</button></div>
+      <p>We send the demo there, and one short email the next day to ask how it opened. Nothing else.</p>
+    </div>
+    ${CLUB_API ? '' : '<p class="preview-note">Preview: the bot and the email are not wired to the demo yet.</p>'}`,
   () => {
-    const go = () => {
+    $('tg').onclick = () => setTimeout(() => showThanks('telegram'), 400)
+    $('useEmail').onclick = () => { $('emailBox').hidden = false; $('useEmail').hidden = true; $('email').focus() }
+    const go = async () => {
       const v = $('email').value.trim()
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) { $('err').textContent = 'That doesn\'t look like an email.'; return }
+      if (CLUB_API) {
+        $('go').disabled = true
+        try {
+          const r = await fetch(CLUB_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: v, code: startCode() }) })
+          if (!r.ok) throw new Error(r.status)
+        } catch { $('go').disabled = false; $('err').textContent = 'Could not send it. Try again in a moment.'; return }
+      }
       showReady()
     }
     $('go').onclick = go
     $('email').onkeydown = (e) => { if (e.key === 'Enter') go() }
-    $('email').focus()
   })
 }
 
@@ -663,13 +699,11 @@ function showReady() {
   const demo = PARTS.filter((p) => p.on && isDemo(p))
   screen(`
     <div class="sheet__step">Ready</div>
-    <div class="sheet__h">Your demo is ready.</div>
-    <div class="file">⬇ ${esc(projectName())} - demo.zip</div>
-    <button class="btn btn--go" id="dl" style="width:100%">Download</button>
-    <p class="preview-note" id="dlnote" hidden>Preview: in the live version the zip downloads here.</p>
+    <div class="sheet__h">Check your inbox.</div>
+    <p>We sent you a link to <b style="color:#e7e7ea">${esc(projectName())} - demo.zip</b>.</p>
     <p>Unzip it and double-click <b style="color:#e7e7ea">${esc(projectName())} - demo.als</b>. It has ${demo.length} of your ${PARTS.filter((p) => p.on).length} parts.</p>
-    <div class="row" style="margin-top:12px"><button class="btn" id="go">Next</button></div>`,
-  () => { $('dl').onclick = () => { $('dlnote').hidden = false }; $('go').onclick = showThanks })
+    <div class="row" style="margin-top:12px"><button class="btn btn--go" id="go">Next</button></div>`,
+  () => { $('go').onclick = () => showThanks('email') })
 }
 
 // Four questions, one per screen, before the price. The Suite question is skipped for
@@ -693,11 +727,12 @@ function ask(i) {
   () => onChoice(list, (v) => { answers[q.id] = v; ask(i + 1) }))
 }
 
-function showThanks() {
+function showThanks(via = 'email') {
   screen(`
     <div class="sheet__step">What's next</div>
-    <div class="sheet__h">Open your demo in Ableton.</div>
-    <p>Tomorrow we'll email you to ask how it went.</p>
+    ${via === 'telegram'
+      ? '<div class="sheet__h">Open Telegram.</div><p>The midee bot has your demo. Open it in Ableton, and tell the bot how it went.</p>'
+      : '<div class="sheet__h">Open your demo in Ableton.</div><p>Tomorrow we\'ll email you to ask how it went.</p>'}
     <a class="btn btn--inside" href="https://midee.me/?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">The midee plugin<small>every midee sound inside Ableton, in any key</small></a>
     <a class="btn btn--inside" href="https://midee.me/breakdowns?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">What's actually inside the track you love?<small>midee breakdowns</small></a>
     <div class="row" style="margin-top:12px">${closeBtn}</div>`)
@@ -981,6 +1016,7 @@ Promise.all(PARTS.map(loadPart)).then(() => {
   recompute(); drawParts()
   $('next').disabled = false; drawStage()
   $('enter').disabled = false; $('enter').textContent = 'Enter the club'
+  drawIdeas()
   msg('Amber: ten parts of one midee track, real previews from the library.')
 }).catch((e) => { $('next').textContent = 'Could not load'; $('enter').textContent = 'Could not load the club'; msg(e.message) })
 $('enter').onclick = () => { $('welcome').hidden = true; goTo(1) }
