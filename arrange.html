@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>midee · arrange · from a loop to a track</title>
+<style>
+  @font-face { font-family: 'DM Sans'; src: url('fonts/dm-sans-regular-latin.woff2') format('woff2'); }
+  :root { --mono: ui-monospace, 'SF Mono', Menlo, monospace; --dim: #8a8a93; --line: rgba(255,255,255,.12); --low: #a78bfa; --high: #5eead4; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #000; color: #e7e7ea; font-family: 'DM Sans', system-ui, sans-serif; }
+  body { padding: 18px 24px 28px; max-width: 1280px; margin: 0 auto; }
+  .hud { font: 12px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; gap: 12px; }
+  .hud b { color: #e7e7ea; font-weight: 600; }
+  .hud a { color: var(--dim); }
+  [hidden] { display: none !important; }
+
+  /* the running bar on top, like a DJ player's track overview */
+  .ov { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: #070708; padding: 10px 12px 8px; }
+  .ov__sec { position: relative; height: 16px; }
+  .ov__sec span { position: absolute; top: 0; height: 16px; border-radius: 3px; overflow: hidden; white-space: nowrap; font: 600 9px/16px var(--mono); letter-spacing: 1px; text-transform: uppercase; color: #000; padding-left: 4px; cursor: pointer; }
+  .ov__sec span.brk { background: #1c1c20 !important; color: var(--dim); }
+  .ov__wave { position: relative; margin-top: 6px; cursor: pointer; }
+  .ov canvas { display: block; width: 100%; height: 48px; }
+  .ov__head { position: absolute; top: -24px; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,.8); pointer-events: none; }
+  .ov__info { display: flex; align-items: center; gap: 14px; margin-top: 8px; font: 12px/1 var(--mono); letter-spacing: 1px; color: var(--dim); }
+  .ov__info b { color: #e7e7ea; font-weight: 600; }
+  .ov__info .next { color: #fde047; }
+  .ov__info .rem { margin-left: auto; }
+  .dots { display: flex; gap: 4px; }
+  .dots i { width: 7px; height: 7px; border-radius: 50%; background: #2a2a30; }
+  .dots i.on { background: #fde047; }
+
+  /* Arrangement View */
+  .arr { margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; background: #0b0b0d; overflow: hidden; }
+  .arr__grid { display: grid; grid-template-columns: 230px 1fr; }
+  .arr__corner { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .arr__ruler { position: relative; height: 40px; border-bottom: 1px solid var(--line); background: #101013; overflow: hidden; cursor: pointer; }
+  .tick { position: absolute; top: 4px; font: 10px/1 var(--mono); color: var(--dim); transform: translateX(3px); transition: left .8s ease; }
+  .tick::before { content: ''; position: absolute; left: -3px; top: 0; height: 8px; border-left: 1px solid #3a3a42; }
+  .loc { position: absolute; top: 20px; font: 600 10px/1 var(--mono); letter-spacing: .5px; color: #e7e7ea; white-space: nowrap; transition: left .8s ease, opacity .4s; }
+  .loc::before { content: ''; display: inline-block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 8px solid #e7e7ea; margin-right: 3px; vertical-align: -1px; }
+  .loc.brk { color: var(--dim); }
+  .loc.brk::before { border-top-color: var(--dim); }
+  .brace { position: absolute; top: 15px; height: 4px; background: #fde047; border-radius: 2px; transition: left .8s ease, width .8s ease, opacity .4s; }
+  .hdr { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-right: 1px solid var(--line); border-bottom: 1px solid #18181c; font: 11px/1.1 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hdr i { flex: 0 0 auto; width: 8px; height: 18px; border-radius: 2px; }
+  .hdr span { overflow: hidden; text-overflow: ellipsis; }
+  .lane { position: relative; height: 30px; border-bottom: 1px solid #18181c; overflow: hidden; }
+  .clip { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; overflow: hidden; transition: left .8s ease, width .8s ease, opacity .5s; }
+  .clip::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: rgba(0,0,0,.28); }
+  .clip::after { content: ''; position: absolute; left: 3px; right: 3px; top: 11px; bottom: 3px; opacity: .35;
+                 background: repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 7px), repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.6) 3px 4px); }
+  .phr { position: absolute; top: 0; bottom: 0; border-left: 1px dashed rgba(253,224,71,.35); pointer-events: none; transition: left .8s ease, opacity .4s; }
+  .gap { position: absolute; top: 0; bottom: 0; background: rgba(255,255,255,.035); pointer-events: none; }
+  .lanes { position: relative; }
+  .head { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; pointer-events: none; z-index: 2; }
+
+  /* coach, the same as in the club */
+  .coach { margin-top: 12px; max-width: 640px; padding: 12px 12px 12px 14px; border-left: 3px solid #fde047; background: rgba(253,224,71,.06); border-radius: 0 10px 10px 0; }
+  .coach__step { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; }
+  .coach__t { font-size: 16px; line-height: 1.45; margin: 6px 0 0; }
+  .row { display: flex; gap: 8px; margin-top: 12px; max-width: 640px; flex-wrap: wrap; }
+  .btn { flex: 1; min-width: 120px; padding: 13px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.05); color: #e7e7ea; cursor: pointer; font: 600 12px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; text-align: center; text-decoration: none; }
+  .btn:hover { border-color: #fff; }
+  .btn--ghost { flex: 0 0 auto; min-width: 0; }
+  .btn--next { background: #fde047; color: #000; border-color: #fde047; }
+  .btn--get { background: #c4b5fd; color: #000; border-color: #c4b5fd; }
+  .btn[disabled] { opacity: .5; cursor: default; }
+  .msg { font-size: 13px; color: var(--dim); margin-top: 10px; min-height: 18px; max-width: 640px; }
+
+  @media (max-width: 760px) {
+    body { padding: 12px 10px 24px; }
+    .wide { display: none; }
+    .arr__grid { grid-template-columns: 112px 1fr; }
+    .hdr { font-size: 9px; padding: 0 6px; gap: 5px; }
+    .loc { font-size: 8px; }
+    .ov__info { gap: 8px; font-size: 10px; flex-wrap: wrap; }
+    .coach__t { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+  <div class="hud"><span>midee · <b>arrange</b> · Amber<span class="wide"> · techno · 128 BPM · Bm</span></span><a href="./">← the club</a></div>
+
+  <div class="ov">
+    <div class="ov__sec" id="sec"></div>
+    <div class="ov__wave" id="wave"><canvas id="cv"></canvas><div class="ov__head" id="ovHead"></div></div>
+    <div class="ov__info">
+      <b id="elapsed">0:00</b>
+      <span id="barpos">Bar 1</span>
+      <span class="dots" id="dots"><i></i><i></i><i></i><i></i></span>
+      <span class="next" id="countdown"></span>
+      <b class="rem" id="remain">-3:00</b>
+    </div>
+  </div>
+
+  <div class="arr">
+    <div class="arr__grid">
+      <div class="arr__corner"></div>
+      <div class="arr__ruler" id="ruler"></div>
+      <div id="hdrs"></div>
+      <div class="lanes" id="lanes"></div>
+    </div>
+  </div>
+
+  <div class="coach">
+    <div class="coach__step" id="cstep">From a loop to a full track</div>
+    <p class="coach__t" id="ctext">Loading the ten parts of Amber…</p>
+  </div>
+  <div class="row" id="steps">
+    <button class="btn btn--ghost" id="back" disabled>←</button>
+    <button class="btn btn--ghost" id="pp" aria-label="Play">▶</button>
+    <button class="btn btn--next" id="next" disabled>Loading…</button>
+  </div>
+  <div class="row" id="final" hidden>
+    <a class="btn btn--get" href="#" id="get">Get the arranged Ableton project</a>
+    <a class="btn" href="./">Back to the club</a>
+  </div>
+  <div class="msg" id="msg"></div>
+
+<script>
+const STATIC = 'https://midee.fra1.digitaloceanspaces.com/midee/tracks'
+const BPM = 128, BAR = 240 / BPM, BARS = 96, LOOP = 8, KEY = 3
+const PARTS = [
+  ['e29360f8-d212-4aca-ae63-6f9ea12d6644', 'Amber_Kick_128_Simpler', 'Kick', false],
+  ['b928f475-e439-4794-bad9-cb8e044f9e1a', 'Amber_Bass_Low_Bm_128_Wavetable', 'Bass', true],
+  ['c5faab66-72c7-4cc2-95ca-4588df32f048', 'Amber_Bass_Acid_Bm_128_Analog', 'Bass', true],
+  ['21af9007-f47c-4158-b8f1-1a7eb3fd3e9e', 'Amber_Drums_Snare_Hats_Ride_128_Drum_Rack', 'Drums', false],
+  ['bcfca28c-d677-4a5b-a023-f67796209d16', 'Amber_Perc_128_Drum_Rack', 'Percussion', false],
+  ['c70a2a1c-8997-4020-8a4f-537a4d08c036', 'Amber_Synth_Chords_Bm_128_Wavetable', 'Synth', true],
+  ['59724fd3-ee3c-4815-8649-b6944393cfad', 'Amber_Synth_Pluck_Bm_128_Analog', 'Synth', true],
+  ['85549f24-1a91-4c22-b550-917fbb298210', 'Amber_Synth_Lead_Acid_Bm_128_Analog', 'Synth', true],
+  ['9e74c9b6-c332-46cf-91d6-5fdd7a78c580', 'Amber_FX_Glitch_128_Analog', 'FX', false],
+  ['be26f11e-4a98-4c8a-9742-fa64c75d96f4', 'Amber_Vox_128_Drum_Rack', 'Vocal', false],
+].map(([id, name, group, tonal]) => ({ id, name, group, tonal }))
+const COLORS = { Kick: '#fde047', Drums: '#fb923c', Percussion: '#f97316', Bass: '#a78bfa', Synth: '#5eead4', FX: '#94a3b8', Vocal: '#f472b6' }
+
+// The arrangement: clips per part, in bars (from–to, inclusive), the way they
+// would sit in Ableton's Arrangement View. Kick, Perc → +Drums, Bass Low →
+// +Acid, Chords → everything → a rest → everything → parts leave.
+const CLIPS = [
+  [[1, 15], [17, 30], [33, 44], [49, 63], [65, 78], [81, 96]],   // kick: out in every break
+  [[17, 30], [49, 63], [65, 78], [81, 92]],                       // bass low: waits in the pre-drop
+  [[33, 48], [49, 63], [65, 78], [81, 88]],                       // bass acid
+  [[17, 96]],                                                     // drums
+  [[1, 96]],                                                      // perc
+  [[33, 48], [49, 64], [65, 80], [81, 88]],                       // chords
+  [[49, 64], [65, 80], [81, 88]],                                 // pluck
+  [[49, 64], [81, 88]],                                           // lead
+  [[45, 48], [77, 80]],                                           // fx: rises into the drops
+  [[49, 64], [81, 88]],                                           // vox
+]
+// Locators. A break cuts the low end of everything (high-pass on the master).
+const LOCS = [
+  { at: 1, name: 'Intro', color: '#5eead4', text: 'Intro. Only kick and percussion. This is where a DJ mixes your track in, so it stays simple and steady.' },
+  { at: 16, name: 'Break', brk: true, text: 'Break. The kick and the low end step out for one bar, so the next bar hits harder.' },
+  { at: 17, name: 'Part 1', color: '#a78bfa', text: 'Part 1. A new pair comes in: the hats and the low bass. The groove starts to move.' },
+  { at: 31, name: 'Break', brk: true, text: 'Break. Two bars without the low end. Listen: something new comes right after it.' },
+  { at: 33, name: 'Pre-drop', color: '#fb923c', text: 'Pre-drop. The acid bass and the chords come in. The low bass waits, so you feel the drop coming.' },
+  { at: 45, name: 'Pit', brk: true, text: 'A four-bar pit. Everything low goes away and the effect rises. The drop needs a gap to land in.' },
+  { at: 49, name: 'Drop', color: '#fde047', text: 'Drop. Everything plays together with the full low end. The peak of the track.' },
+  { at: 64, name: 'Break', brk: true, text: 'Break. One bar to breathe after the drop.' },
+  { at: 65, name: 'Part 2', color: '#a78bfa', text: 'Part 2. The lead and the vocal step out. The floor gets a rest from the drop.' },
+  { at: 79, name: 'Break', brk: true, text: 'Break. Two bars, the effect rises again. The second drop is next.' },
+  { at: 81, name: 'Drop 2', color: '#fde047', text: 'Drop 2. The second peak, close to the first.' },
+  { at: 89, name: 'Outro', color: '#5eead4', text: 'Outro. Parts leave one by one, so the DJ can mix the next track in.' },
+]
+LOCS.forEach((l, i) => { l.to = (LOCS[i + 1]?.at ?? BARS + 1) - 1 })
+const isBreak = (b) => LOCS.some((l) => l.brk && b >= l.at && b <= l.to)
+
+const STEPS = [
+  { mode: 'loop', label: 'Step 1 of 4 · Your loop', next: 'Stretch it to 3 minutes',
+    text: 'This is your loop: 8 bars of Amber, every part playing, over and over. It sounds good for a minute. A track is this loop, changing over three minutes.' },
+  { mode: 'stretch', label: 'Step 2 of 4 · Stretch it', next: 'Show the phrases',
+    text: 'Now the loop runs for 3 minutes, 96 bars. Every part plays all the time. Nothing changes, so nothing happens. This is where many first tracks get stuck.' },
+  { mode: 'phrases', label: 'Step 3 of 4 · Phrases', next: 'Build the track',
+    text: 'Techno moves in phrases of 16 bars. A DJ counts them, and at the start of each phrase something changes. The flags on top are locators: they name the parts of the track.' },
+  { mode: 'arranged', label: 'Step 4 of 4 · Build it', next: null,
+    text: 'The same loop, arranged. Watch the clips and the bar on top: parts come in by pairs, and before each new pair the low end drops out for a break.' },
+]
+const START_TEXT = 'In the club you built a loop: 8 bars of Amber with all ten parts. Here you turn it into a 3-minute track, the way producers do it in Ableton\'s Arrangement View.'
+const END_TEXT = 'That\'s a track: the same ten parts, arranged. 3 minutes is a learning length. Club tracks usually run longer, with a longer intro and outro for the DJ.'
+
+const $ = (id) => document.getElementById(id)
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+const msg = (t) => { $('msg').textContent = t }
+let step = -1, mode = 'loop'
+
+// ================= audio =================
+const ctx = new (window.AudioContext || window.webkitAudioContext)()
+const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 10; hp.Q.value = 0.7
+const master = ctx.createGain(); master.gain.value = 0.8
+hp.connect(master); master.connect(ctx.destination)
+let mp4Only = false
+const oggOf = (p) => `${STATIC}/${p.id}/ogg/${p.tonal ? `key-${KEY}/` : ''}${BPM}.ogg`
+const mp4Of = (p) => `${STATIC}/${p.id}/render/${BPM}.mp4`
+async function fetchDecode(url) {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return ctx.decodeAudioData(await res.arrayBuffer())
+}
+async function loadPart(p) {
+  if (!mp4Only) { try { p.buffer = await fetchDecode(oggOf(p)) } catch (e) { if (String(e).includes('HTTP')) throw e; mp4Only = true } }
+  if (mp4Only) p.buffer = await fetchDecode(mp4Of(p))
+  p.gain = ctx.createGain(); p.gain.gain.value = 0; p.gain.connect(hp)
+  p.env = await envelope(p.buffer)
+}
+// Energy below and above ~120 Hz for every 16th of the 8-bar preview.
+async function envelope(buf) {
+  const SR = 22050, len = Math.ceil(buf.duration * SR)
+  const band = async (type) => {
+    const off = new OfflineAudioContext(1, len, SR)
+    const src = off.createBufferSource(); src.buffer = buf
+    const f = off.createBiquadFilter(); f.type = type; f.frequency.value = 120
+    src.connect(f); f.connect(off.destination); src.start()
+    const d = (await off.startRendering()).getChannelData(0)
+    const n = LOOP * 16, per = Math.floor(Math.min(len, LOOP * BAR * SR) / n)
+    return Array.from({ length: n }, (_, i) => { let s = 0; for (let k = i * per; k < (i + 1) * per; k++) s += d[k] * d[k]; return Math.sqrt(s / per) })
+  }
+  return { low: await band('lowpass'), high: await band('highpass') }
+}
+
+const isOn = (i, b) => mode === 'arranged' ? CLIPS[i].some(([f, t]) => b >= f && b <= t) : true
+let t0 = 0, bar0 = 1, playing = false, endAt = Infinity
+function stopAll() {
+  for (const p of PARTS) { if (p.src) { try { p.src.stop() } catch {} p.src.disconnect(); p.src = null } p.gain?.gain.cancelScheduledValues(0); if (p.gain) p.gain.gain.value = 0 }
+  hp.frequency.cancelScheduledValues(0); hp.frequency.value = 10
+  playing = false
+}
+async function play(fromBar = 1) {
+  stopAll()
+  if (ctx.state !== 'running') await ctx.resume()
+  t0 = ctx.currentTime + 0.15; bar0 = fromBar
+  const loopLen = LOOP * BAR, offset = ((fromBar - 1) % LOOP) * BAR
+  PARTS.forEach((p, i) => {
+    const src = ctx.createBufferSource(); src.buffer = p.buffer; src.loop = true
+    src.loopStart = 0; src.loopEnd = Math.min(loopLen, p.buffer.duration)
+    src.connect(p.gain); src.start(t0, offset % src.loopEnd); p.src = src
+    const g = p.gain.gain; g.cancelScheduledValues(0); g.setValueAtTime(0, ctx.currentTime)
+    if (mode === 'loop') { g.setValueAtTime(1, t0); return }
+    for (let b = fromBar; b <= BARS; b++) g.setValueAtTime(isOn(i, b) ? 1 : 0, t0 + (b - fromBar) * BAR)
+    g.setValueAtTime(0, t0 + (BARS + 1 - fromBar) * BAR)
+  })
+  if (mode === 'arranged') for (let b = fromBar; b <= BARS; b++) hp.frequency.setValueAtTime(isBreak(b) ? 450 : 10, t0 + (b - fromBar) * BAR)
+  endAt = mode === 'loop' ? Infinity : t0 + (BARS + 1 - fromBar) * BAR
+  playing = true; drawPP()
+}
+function barNow() {
+  if (!playing) return bar0
+  const el = Math.max(0, ctx.currentTime - t0) / BAR
+  return mode === 'loop' ? 1 + (el % LOOP) : Math.min(BARS + 0.999, bar0 + el)
+}
+async function togglePlay() {
+  if (!playing) return play(mode === 'loop' ? 1 : Math.floor(bar0))
+  if (ctx.state === 'running') await ctx.suspend(); else await ctx.resume()
+  drawPP()
+}
+function drawPP() {
+  const on = playing && ctx.state === 'running'
+  $('pp').textContent = on ? '❚❚' : '▶'; $('pp').setAttribute('aria-label', on ? 'Pause' : 'Play')
+}
+ctx.onstatechange = drawPP
+$('pp').onclick = togglePlay
+
+// ================= Arrangement View =================
+const visBars = () => mode === 'loop' ? 16 : BARS
+const pos = (b) => `${((b - 1) / visBars()) * 100}%`
+function clipsFor(i) { return mode === 'loop' ? [[1, LOOP]] : mode === 'arranged' ? CLIPS[i] : [[1, BARS]] }
+
+PARTS.forEach((p) => {
+  const h = document.createElement('div'); h.className = 'hdr'
+  h.innerHTML = `<i style="background:${COLORS[p.group]}"></i><span title="${p.name}">${p.name}</span>`
+  $('hdrs').append(h)
+  const lane = document.createElement('div'); lane.className = 'lane'; $('lanes').append(lane); p.lane = lane
+})
+const headEl = document.createElement('div'); headEl.className = 'head'; $('lanes').append(headEl)
+
+function drawArrangement() {
+  // ruler: bar numbers, the loop brace, locators
+  const r = $('ruler'); r.innerHTML = ''
+  const narrow = window.innerWidth < 760
+  const every = mode === 'loop' ? (narrow ? 4 : 2) : (narrow ? 16 : 8)
+  for (let b = 1; b <= visBars(); b += every) r.insertAdjacentHTML('beforeend', `<span class="tick" style="left:${pos(b)}">${b}</span>`)
+  if (mode === 'loop') r.insertAdjacentHTML('beforeend', `<span class="brace" style="left:${pos(1)};width:${(LOOP / visBars()) * 100}%"></span>`)
+  if (mode === 'phrases' || mode === 'arranged') {
+    for (const l of LOCS) if (mode === 'arranged' || !l.brk) r.insertAdjacentHTML('beforeend', `<span class="loc${l.brk ? ' brk' : ''}" style="left:${pos(l.at)}" title="${l.name}">${l.brk || narrow ? '' : l.name}</span>`)
+  }
+  // lanes: clips, phrase lines, break shading
+  PARTS.forEach((p, i) => {
+    p.lane.innerHTML = clipsFor(i).map(([f, t]) => `<div class="clip" style="left:${pos(f)};width:${((t - f + 1) / visBars()) * 100}%;background:${COLORS[p.group]}"></div>`).join('')
+  })
+  $('lanes').querySelectorAll('.phr,.gap').forEach((e) => e.remove())
+  if (mode === 'phrases' || mode === 'arranged') for (let b = 17; b <= BARS; b += 16) $('lanes').insertAdjacentHTML('beforeend', `<div class="phr" style="left:${pos(b)}"></div>`)
+  if (mode === 'arranged') for (const l of LOCS) if (l.brk) $('lanes').insertAdjacentHTML('beforeend', `<div class="gap" style="left:${pos(l.at)};width:${((l.to - l.at + 1) / BARS) * 100}%"></div>`)
+  drawOverview()
+}
+
+// ================= the running bar on top =================
+const cv = $('cv')
+let NORM = 1
+function column(b, s) {
+  let low = 0, high = 0
+  PARTS.forEach((p, i) => { if (!isOn(i, b)) return; const k = ((b - 1) % LOOP) * 16 + s; low += p.env.low[k]; high += p.env.high[k] })
+  if (mode === 'arranged' && isBreak(b)) low *= 0.06
+  return [low, high]
+}
+function drawOverview() {
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = 48
+  cv.width = W * dpr; cv.height = H * dpr
+  const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, W, H)
+  const total = mode === 'loop' ? LOOP : BARS
+  for (let x = 0; x < W; x++) {
+    const c = Math.floor((x / W) * total * 16), b = Math.floor(c / 16) + 1, s = c % 16
+    const [low, high] = column(b, s)
+    const hh = Math.min(1, high / NORM) * (H / 2 - 1), lh = Math.min(1, low / NORM) * (H / 2 - 1)
+    g.fillStyle = 'rgba(94,234,212,.55)'; g.fillRect(x, H / 2 - hh, 1, hh * 2)
+    g.fillStyle = '#a78bfa'; g.fillRect(x, H / 2 - lh, 1, lh * 2)
+  }
+  // sections
+  const sec = $('sec'); sec.innerHTML = ''
+  if (mode === 'arranged') {
+    for (const l of LOCS) sec.insertAdjacentHTML('beforeend', `<span class="${l.brk ? 'brk' : ''}" data-at="${l.at}" style="left:${((l.at - 1) / BARS) * 100}%;width:calc(${((l.to - l.at + 1) / BARS) * 100}% - 1px);background:${l.color || ''}">${l.brk ? '' : l.name}</span>`)
+  } else {
+    sec.insertAdjacentHTML('beforeend', `<span class="brk" style="left:0;width:100%">${mode === 'loop' ? 'Loop · 8 bars, over and over' : '96 bars · the same loop the whole time'}</span>`)
+  }
+  sec.querySelectorAll('[data-at]').forEach((e) => { e.onclick = () => play(+e.dataset.at) })
+}
+function seekFrom(e, el) {
+  if (mode === 'loop') return
+  const r = el.getBoundingClientRect(), b = 1 + Math.floor(((e.clientX - r.left) / r.width) * BARS)
+  play(Math.max(1, Math.min(BARS, b)))
+}
+$('wave').onclick = (e) => seekFrom(e, $('wave'))
+$('ruler').onclick = (e) => seekFrom(e, $('ruler'))
+
+// ================= live readout =================
+let lastLoc = null
+function tick() {
+  requestAnimationFrame(tick)
+  if (!PARTS[0].env) return
+  if (playing && ctx.currentTime >= endAt) { stopAll(); bar0 = 1; drawPP(); if (mode === 'arranged') { $('ctext').textContent = END_TEXT; $('cstep').textContent = 'Step 4 of 4 · Done' } }
+  const bar = barNow(), total = mode === 'loop' ? LOOP : BARS
+  const el = mode === 'loop' ? (bar - 1) * BAR : (bar - 1) * BAR
+  $('ovHead').style.left = `${((bar - 1) / total) * 100}%`
+  headEl.style.left = `${((bar - 1) / visBars()) * 100}%`
+  $('elapsed').textContent = fmt(el)
+  $('remain').textContent = mode === 'loop' ? 'loop' : `-${fmt(BARS * BAR - el)}`
+  const b = Math.floor(bar), beat = playing && ctx.state === 'running' ? Math.floor((bar - b) * 4) : -1
+  $('barpos').textContent = mode === 'loop' ? `Bar ${b} of 8` : `Bar ${b} · Phrase ${Math.ceil(b / 16)}`
+  $('dots').querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i === beat))
+  let cd = ''
+  if (mode === 'phrases') { const n = 16 - ((b - 1) % 16); cd = `Next phrase in ${n} bar${n > 1 ? 's' : ''}` }
+  if (mode === 'arranged') {
+    const nx = LOCS.find((l) => l.at > b)
+    if (nx) { const n = nx.at - b; cd = `${nx.name} in ${n} bar${n > 1 ? 's' : ''}` }
+    const cur = [...LOCS].reverse().find((l) => l.at <= b)
+    if (playing && cur && cur !== lastLoc) { lastLoc = cur; $('cstep').textContent = `Step 4 of 4 · ${cur.name}`; $('ctext').textContent = cur.text }
+  }
+  $('countdown').textContent = cd
+}
+requestAnimationFrame(tick)
+
+// ================= steps =================
+function goTo(n) {
+  step = Math.max(0, Math.min(STEPS.length - 1, n))
+  const s = STEPS[step]; mode = s.mode; lastLoc = null
+  $('cstep').textContent = s.label; $('ctext').textContent = s.text
+  $('next').hidden = !s.next; $('next').textContent = s.next || ''
+  $('back').disabled = step === 0
+  $('final').hidden = !!s.next
+  drawArrangement()
+  play(1)
+}
+$('next').onclick = () => goTo(step + 1)
+$('back').onclick = () => goTo(step - 1)
+$('get').onclick = (e) => { e.preventDefault(); msg('Next to build: the Ableton project with this arrangement, clips on the bars and locators with the names of the parts.') }
+addEventListener('resize', () => { if (PARTS[0].env) drawArrangement() })
+
+Promise.all(PARTS.map(loadPart)).then(() => {
+  // one scale for every mode: the loudest moment of the full loop
+  mode = 'stretch'
+  for (let c = 0; c < LOOP * 16; c++) { const [l, h] = column(1 + Math.floor(c / 16), c % 16); NORM = Math.max(NORM === 1 ? 0 : NORM, l, h) }
+  mode = 'loop'
+  $('ctext').textContent = START_TEXT
+  $('next').disabled = false; $('next').textContent = 'Play the loop'
+  $('next').onclick = () => { $('next').onclick = () => goTo(step + 1); goTo(0) }
+  drawArrangement()
+}).catch((e) => { $('next').textContent = 'Could not load'; msg(e.message) })
+</script>
+</body>
+</html>
