@@ -38,6 +38,8 @@
   .btn:hover { border-color: #fff; }
   .btn--play { background: #e7e7ea; color: #000; border-color: #e7e7ea; }
   .btn--get { background: #c4b5fd; color: #000; border-color: #c4b5fd; margin-top: 8px; width: 100%; }
+  .btn--inside { display: block; box-sizing: border-box; margin-top: 8px; width: 100%; text-align: center; text-decoration: none; color: #e7e7ea; text-transform: none; letter-spacing: 0; font: 600 14px/1.3 'DM Sans', system-ui, sans-serif; }
+  .btn--inside small { display: block; margin-top: 4px; font: 10px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); }
   .btn--catch { margin-top: 8px; width: 100%; border-color: #fde047; color: #fde047; }
   .ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .ideas:empty { display: none; }
@@ -155,7 +157,8 @@
       </div>
       <button class="btn btn--catch" id="catch">Catch idea</button>
       <div class="ideas" id="ideas"></div>
-      <button class="btn btn--get" id="get">Get the Ableton project</button>
+      <button class="btn btn--get" id="get">Get your first Ableton project</button>
+      <a class="btn btn--inside" href="https://midee.me/breakdowns?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">What's actually inside the track you love?<small>midee breakdowns</small></a>
     </div>
     <button class="link" id="skip">Skip to the full track</button>
     <div class="msg" id="msg"></div>
@@ -376,7 +379,7 @@ const msg = (t, mud = false) => { $('msg').textContent = t; $('msg').classList.t
 
 // ---------- the build ----------
 const STAGE0 = 'Build a midee track from nothing, one part at a time. Watch the four glasses fill up and the floor wake up.'
-const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, catch the mixes you like as ideas, and take it all as an Ableton project.'
+const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, catch the mixes you like as ideas, and take it all as your first Ableton project.'
 async function goTo(n) {
   if (!playing) { await ctx.resume(); const when = ahead(); startAt = when; playing = true; PARTS.forEach((p) => startPart(p, when)) }
   else if (ctx.state !== 'running') { userPaused = false; await ctx.resume() }
@@ -533,7 +536,7 @@ function showProject() {
   catchIdea(true)
   const on = PARTS.filter((p) => p.on)
   screen(`
-    <div class="sheet__step">Your project</div>
+    <div class="sheet__step">Your first Ableton project</div>
     <div class="sheet__h">${esc(projectName())}</div>
     <p>Techno · 128 BPM · ${KEYS[key - 1]} · ${on.length} parts</p>
     <ol>${on.map((p) => `<li style="font:12px/1.5 var(--mono);overflow-wrap:anywhere">${esc(midName(p))}</li>`).join('')}</ol>
@@ -624,7 +627,7 @@ function showThanks() {
     <div class="sheet__step">Done</div>
     <div class="sheet__h">Thank you. Open your project in Ableton.</div>
     <p>Tomorrow we'll email you to ask how it went.</p>
-    <p>Want to know how tracks like this are made? Watch the <a href="https://midee.me/breakdowns" target="_blank" rel="noopener">midee breakdowns</a>.</p>
+    <p>What's actually inside the track you love? Watch the <a href="https://midee.me/breakdowns?utm_source=club&amp;utm_medium=link" target="_blank" rel="noopener">midee breakdowns</a>.</p>
     <div class="row">${closeBtn}</div>`)
 }
 
