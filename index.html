@@ -659,7 +659,9 @@ function showPrice() {
 const BOT = 'https://t.me/Ableton_trainer_bot'
 const CLUB_API = null
 const idx = (id) => { const q = QUESTIONS.find((x) => x.id === id), list = q ? (typeof q.list === 'function' ? q.list() : q.list) : [...PRICES, 'I wouldn\'t pay for it'], i = list.indexOf(answers[id]); return i < 0 ? 'x' : i.toString(36) }
-const startCode = () => `fp_${key.toString(36)}${idx('ableton')}${idx('suite')}${idx('level')}${idx('block')}${idx('price')}${Math.min(IDEAS.length, 9)}__club`
+const startCode = () => `fp_${key.toString(36)}${idx('ableton')}${idx('suite')}${idx('level')}${idx('style')}${idx('block')}${idx('price')}${Math.min(IDEAS.length, 9)}${styleSlug()}__club`
+// A style in the person's own words rides along in the Telegram link: letters and digits only, it has 64 characters in all.
+const styleSlug = () => { const t = (answers.styleOther || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30); return t ? '_' + t : '' }
 
 function showEmail() {
   screen(`
@@ -684,7 +686,7 @@ function showEmail() {
       if (CLUB_API) {
         $('go').disabled = true
         try {
-          const r = await fetch(CLUB_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: v, code: startCode() }) })
+          const r = await fetch(CLUB_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: v, code: startCode(), style: answers.styleOther || undefined }) })
           if (!r.ok) throw new Error(r.status)
         } catch { $('go').disabled = false; $('err').textContent = 'Could not send it. Try again in a moment.'; return }
       }
@@ -706,12 +708,13 @@ function showReady() {
   () => { $('go').onclick = () => showThanks('email') })
 }
 
-// Four questions, one per screen, before the price. The Suite question is skipped for
+// Five questions, one per screen, before the price. The Suite question is skipped for
 // somebody who already has Suite.
 const QUESTIONS = [
   { id: 'ableton', h: 'Do you have Ableton Live?', list: ['Live 12 Suite', 'Live 12 Standard', 'Live 12 Intro', 'Live Lite (came with hardware)', 'A trial', 'Live 11 or older', 'No Ableton yet'] },
   { id: 'suite', h: 'This project opens fully in Live 12 Suite. Would you buy Suite for it?', list: ['Yes', 'Maybe', 'No'], skip: () => answers.ableton === 'Live 12 Suite' },
   { id: 'level', h: 'Where are you now?', list: ['I only DJ', 'I have tried producing', 'I have finished a track'] },
+  { id: 'style', h: 'What do you want to make?', list: ['Techno', 'Hard groove techno', 'Hard techno', 'Hard house', 'Tech house', 'Melodic techno', 'House', 'Something else'], other: 'Something else' },
   { id: 'block', h: 'What stops you from making your own track?', list: ['I don\'t know where to start', 'My sound isn\'t club-ready', 'No time', 'Something else'] },
 ]
 function ask(i) {
@@ -724,7 +727,17 @@ function ask(i) {
     <div class="sheet__step">${n === 1 ? 'Before you get it · Question 1' : `Question ${n}`}</div>
     <div class="sheet__h">${esc(q.h)}</div>
     ${choices(list)}`,
-  () => onChoice(list, (v) => { answers[q.id] = v; ask(i + 1) }))
+  () => onChoice(list, (v) => {
+    answers[q.id] = v
+    if (v !== q.other) return ask(i + 1)
+    // "Something else" opens a line for the person's own words.
+    box.querySelector('.choices').outerHTML = `<input class="field" id="other" maxlength="60" placeholder="Your style, in your words">
+      <div class="row"><button class="btn btn--go" id="go">Next</button></div>`
+    const next = () => { answers[q.id + 'Other'] = $('other').value.trim(); ask(i + 1) }
+    $('go').onclick = next
+    $('other').onkeydown = (e) => { if (e.key === 'Enter') next() }
+    $('other').focus()
+  }))
 }
 
 function showThanks(via = 'email') {
