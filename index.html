@@ -78,6 +78,30 @@
   .note { position: fixed; left: 50%; top: 20px; transform: translateX(-50%); font: 10px/1 var(--mono); letter-spacing: 1px; color: #55555c; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
   [hidden] { display: none !important; }
 
+  /* welcome */
+  .welcome { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 60%, rgba(236,72,153,.18), rgba(0,0,0,.92) 60%); z-index: 5; }
+  .welcome__box { width: min(520px, calc(100vw - 40px)); }
+  .welcome__h { font: 600 30px/1.12 var(--mono); letter-spacing: .5px; margin: 16px 0 14px; }
+  .welcome p { color: #c9c9cf; font-size: 16px; line-height: 1.5; margin: 0 0 10px; }
+  .welcome small { display: block; color: var(--dim); font: 11px/1.4 var(--mono); letter-spacing: 1px; text-transform: uppercase; margin: 16px 0 18px; }
+  .welcome .btn { width: 100%; padding: 16px; font-size: 13px; background: #fde047; color: #000; border-color: #fde047; }
+
+  /* the flow inside the sheet */
+  .sheet { z-index: 6; }
+  .sheet__step { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; margin-bottom: 10px; }
+  .sheet .btn { color: #e7e7ea; }
+  .sheet .btn--go { background: #fde047; color: #000; border-color: #fde047; }
+  .choices { display: grid; gap: 8px; margin: 14px 0 6px; }
+  .choices .btn { text-align: left; text-transform: none; letter-spacing: 0; font: 500 15px/1.25 'DM Sans', system-ui, sans-serif; padding: 13px 14px; }
+  .choices--price { grid-template-columns: repeat(3, 1fr); }
+  .choices--price .btn { text-align: center; font: 600 18px/1 var(--mono); padding: 16px 6px; }
+  .field { width: 100%; box-sizing: border-box; margin: 12px 0 4px; padding: 13px 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: #fff; font: 16px/1.2 'DM Sans', system-ui, sans-serif; }
+  .field:focus { outline: none; border-color: #fde047; }
+  .err { color: #fca5a5; font-size: 13px; min-height: 16px; margin: 4px 0 8px; }
+  .file { display: flex; align-items: center; gap: 10px; padding: 12px 14px; margin: 12px 0; border: 1px dashed var(--line); border-radius: 10px; font: 13px/1.3 var(--mono); }
+  .preview-note { color: #55555c !important; font: 11px/1.4 var(--mono) !important; letter-spacing: .5px; }
+  .sheet a { color: #fde047; }
+
   @media (max-width: 900px) {
     .note { display: none; }
     .deck { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 56vh; padding: 10px 12px 12px; background: rgba(0,0,0,.72); }
@@ -132,15 +156,19 @@
 
   <div class="zones" id="zones"></div>
 
-  <div class="sheet" id="sheet" hidden>
-    <div class="sheet__box">
-      <div class="sheet__h">Your Ableton project</div>
-      <p id="sheetMeta"></p>
-      <ol id="sheetList"></ol>
-      <p>Every part lands on its own track as MIDI with its Ableton Rack, so you can change the notes and every knob.</p>
-      <p><b style="color:#e7e7ea">Concept frame.</b> The site already builds Ableton projects from a set of sounds. Downloading this exact set from this page is the next step to build.</p>
-      <div class="row"><button class="btn" id="sheetClose">Close</button></div>
+  <div class="welcome" id="welcome">
+    <div class="welcome__box">
+      <span class="deck__tag">midee club</span>
+      <div class="welcome__h">Build a techno track.<br>Take it home as your Ableton project.</div>
+      <p>Ten parts of a real track, added one by one. Each time you hear the new part land in the club and see which part of the sound it fills.</p>
+      <p>At the end you change the key, roll the dice on the parts, and download the whole track as a project you can open in Ableton.</p>
+      <small>About 5 minutes · turn the sound on</small>
+      <button class="btn" id="enter" disabled>Loading the club…</button>
     </div>
+  </div>
+
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet__box" id="sheetBox"></div>
   </div>
 
 <script type="module">
@@ -441,12 +469,122 @@ $('pp').onclick = togglePlay
 addEventListener('pointerdown', (e) => {
   if (playing && !userPaused && ctx.state !== 'running' && !e.target.closest('#pp, #play')) ctx.resume()
 })
-$('get').onclick = () => {
-  $('sheetMeta').textContent = `Amber, remixed · Techno · 128 BPM · ${KEYS[key - 1]} · ${PARTS.filter((p) => p.on).length} parts`
-  $('sheetList').innerHTML = PARTS.filter((p) => p.on).map((p) => { const n = pretty(p.name, p.group); return `<li>${n.title} <small>${n.sub}</small></li>` }).join('')
-  $('sheet').hidden = false
+// ================= the take-home flow =================
+// Project → price (fake door) → email → download → five questions → thanks.
+// Preview: everything stays in this page; see the head comment.
+const PRICES = ['€5', '€10', '€20']            // placeholders until Julie names three
+const answers = {}
+const box = $('sheetBox')
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const projectName = () => `Amber - ${KEYS[key - 1]} - midee`
+
+function screen(html, wire) { box.innerHTML = html; $('sheet').hidden = false; wire?.(); box.scrollTop = 0 }
+const closeBtn = '<button class="btn" data-close>Back to the club</button>'
+box.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) $('sheet').hidden = true })
+
+function choices(list, cls = '') {
+  return `<div class="choices ${cls}">${list.map((c, i) => `<button class="btn" data-i="${i}">${esc(c)}</button>`).join('')}</div>`
 }
-$('sheetClose').onclick = () => { $('sheet').hidden = true }
+function onChoice(list, fn) { box.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => fn(list[+b.dataset.i]) }) }
+
+function showProject() {
+  const on = PARTS.filter((p) => p.on)
+  screen(`
+    <div class="sheet__step">Your project</div>
+    <div class="sheet__h">${esc(projectName())}</div>
+    <p>Techno · 128 BPM · ${KEYS[key - 1]} · ${on.length} parts</p>
+    <ol>${on.map((p) => { const n = pretty(p.name, p.group); return `<li>${esc(n.title)} <small>${esc(n.sub)}</small></li>` }).join('')}</ol>
+    <p>Every part opens on its own track as MIDI with its Ableton Rack, so you can change the notes and turn every knob.</p>
+    <p>Made for Ableton Live 12 Suite. No Suite yet? The free trial from Ableton opens it.</p>
+    <div class="row"><button class="btn" data-close>Back</button><button class="btn btn--go" id="go">Get it</button></div>`,
+  () => { $('go').onclick = showPrice })
+}
+
+function showPrice() {
+  const list = [...PRICES, 'I wouldn\'t pay for it']
+  screen(`
+    <div class="sheet__step">One question first</div>
+    <div class="sheet__h">What is a project like this worth to you?</div>
+    <p>A full track you built yourself, ready to open in Ableton.</p>
+    ${choices(PRICES, 'choices--price')}
+    <div class="choices"><button class="btn" data-i="3">I wouldn't pay for it</button></div>`,
+  () => onChoice(list, (v) => { answers.price = v; showFree() }))
+}
+
+function showFree() {
+  screen(`
+    <div class="sheet__step">Thank you</div>
+    <div class="sheet__h">During the test, your first project is free.</div>
+    <p>Your answer helps us set a fair price later.</p>
+    <div class="row"><button class="btn btn--go" id="go">Continue</button></div>`,
+  () => { $('go').onclick = showEmail })
+}
+
+function showEmail() {
+  screen(`
+    <div class="sheet__step">Where should we send it?</div>
+    <div class="sheet__h">Your email</div>
+    <p>We send the project here, and one short email the next day to ask how it opened. Nothing else.</p>
+    <input class="field" id="email" type="email" autocomplete="email" placeholder="you@example.com">
+    <div class="err" id="err"></div>
+    <div class="row"><button class="btn btn--go" id="go">Send me the project</button></div>
+    <p class="preview-note">Preview: this email is not sent or saved anywhere.</p>`,
+  () => {
+    const go = () => {
+      const v = $('email').value.trim()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) { $('err').textContent = 'That doesn\'t look like an email.'; return }
+      showReady()
+    }
+    $('go').onclick = go
+    $('email').onkeydown = (e) => { if (e.key === 'Enter') go() }
+    $('email').focus()
+  })
+}
+
+function showReady() {
+  screen(`
+    <div class="sheet__step">Ready</div>
+    <div class="sheet__h">Your project is ready.</div>
+    <div class="file">⬇ ${esc(projectName())}.zip</div>
+    <button class="btn btn--go" id="dl" style="width:100%">Download</button>
+    <p class="preview-note" id="dlnote" hidden>Preview: in the live version the zip downloads here.</p>
+    <p>Unzip it and double-click <b style="color:#e7e7ea">${esc(projectName())}.als</b>.</p>
+    <div class="row" style="margin-top:12px"><button class="btn" id="go">Next</button></div>`,
+  () => { $('dl').onclick = () => { $('dlnote').hidden = false }; $('go').onclick = () => ask(0) })
+}
+
+// The five questions, one per screen. The Suite question is skipped for
+// somebody who already has Suite.
+const QUESTIONS = [
+  { id: 'ableton', h: 'Do you have Ableton Live?', list: ['Live 12 Suite', 'Live 12 Standard', 'Live 12 Intro', 'Live Lite (came with hardware)', 'A trial', 'Live 11 or older', 'No Ableton yet'] },
+  { id: 'suite', h: 'This project opens fully in Live 12 Suite. Would you buy Suite for it?', list: ['Yes', 'Maybe', 'No'], skip: () => answers.ableton === 'Live 12 Suite' },
+  { id: 'level', h: 'Where are you now?', list: ['I only DJ', 'I have tried producing', 'I have finished a track'] },
+  { id: 'block', h: 'What stops you from making your own track?', list: ['I don\'t know where to start', 'My sound isn\'t club-ready', 'No time', 'Something else'] },
+  { id: 'next', h: 'What would you pay for the next project like this?', list: () => [...PRICES, 'I wouldn\'t pay for it'] },
+]
+function ask(i) {
+  while (i < QUESTIONS.length && QUESTIONS[i].skip?.()) i++
+  if (i >= QUESTIONS.length) return showThanks()
+  const q = QUESTIONS[i], list = typeof q.list === 'function' ? q.list() : q.list
+  // No "of 5": the total changes once the first answer says Suite.
+  const n = QUESTIONS.slice(0, i + 1).filter((x) => !x.skip?.()).length, last = i === QUESTIONS.length - 1
+  screen(`
+    <div class="sheet__step">${last ? 'Last question' : `Question ${n}`}</div>
+    <div class="sheet__h">${esc(q.h)}</div>
+    ${choices(list)}`,
+  () => onChoice(list, (v) => { answers[q.id] = v; ask(i + 1) }))
+}
+
+function showThanks() {
+  screen(`
+    <div class="sheet__step">Done</div>
+    <div class="sheet__h">Thank you. Open your project in Ableton.</div>
+    <p>Tomorrow we'll email you to ask how it went.</p>
+    <p>Want to know how tracks like this are made? Watch the <a href="https://midee.me/breakdowns" target="_blank" rel="noopener">midee breakdowns</a>.</p>
+    <div class="row">${closeBtn}</div>`)
+}
+
+$('get').onclick = showProject
 
 const zonesEl = $('zones')
 for (const z of ZONES) {
@@ -669,8 +807,10 @@ Promise.all(PARTS.map(loadPart)).then(() => {
   REF = k.reduce((a, _, t) => a + k[t][0] + b[t % b.length][0], 0) / k.length
   recompute(); drawParts()
   $('next').disabled = false; drawStage()
+  $('enter').disabled = false; $('enter').textContent = 'Enter the club'
   msg('Amber: ten parts of one midee track, real previews from the library.')
-}).catch((e) => { $('next').textContent = 'Could not load'; msg(e.message) })
+}).catch((e) => { $('next').textContent = 'Could not load'; $('enter').textContent = 'Could not load the club'; msg(e.message) })
+$('enter').onclick = () => { $('welcome').hidden = true; goTo(1) }
 </script>
 </body>
 </html>
