@@ -835,8 +835,8 @@ function showReady() {
   screen(`
     <div class="sheet__step">Ready</div>
     <div class="sheet__h">Check your inbox.</div>
-    <p>We sent you a link to <b style="color:#e7e7ea">${esc(projectName())} - demo.zip</b>.</p>
-    <p>Unzip it and double-click <b style="color:#e7e7ea">${esc(projectName())} - demo.als</b>. It has ${demo.length} of your ${PARTS.filter((p) => p.on).length} parts.</p>
+    <p>We sent you a link to <b style="color:#e7e7ea">Amber - midee - demo.zip</b>.</p>
+    <p>Unzip it and double-click <b style="color:#e7e7ea">Amber - midee - demo.als</b>. It has ${demo.length} of your ${PARTS.filter((p) => p.on).length} parts.</p>
     <div class="row" style="margin-top:12px"><button class="btn btn--go" id="go">Next</button></div>`,
   () => { $('go').onclick = () => showThanks('email') })
 }
