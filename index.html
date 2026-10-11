@@ -850,7 +850,7 @@ const QUESTIONS = [
   { id: 'ableton', h: 'Do you have Ableton Live?', list: ['Live 12 Suite', 'Live 12 Standard', 'Live 12 Intro', 'Live Lite (came with hardware)', 'A trial', 'Live 11 or older', 'No Ableton yet'] },
   { id: 'suite', h: 'This project opens fully in Live 12 Suite. Would you buy Suite for it?', list: ['Yes', 'Maybe', 'No'], skip: () => answers.ableton === 'Live 12 Suite' },
   { id: 'level', h: 'Where are you now?', list: ['I only DJ', 'I have tried producing', 'I have finished a track'] },
-  { id: 'style', h: 'What do you want to make?', list: ['Techno', 'Hard groove techno', 'Hard techno', 'Hard house', 'Tech house', 'Melodic techno', 'House', 'Something else'], other: 'Something else' },
+  { id: 'style', h: 'What do you want to make?', list: ['Techno', 'House', 'Electro', 'Breakbeat', 'Breaks', 'Trance', 'Electronica', 'Something else'], other: 'Something else' },
   { id: 'block', h: 'What stops you from making your own track?', list: ['I don\'t know where to start', 'My sound isn\'t club-ready', 'No time', 'Something else'] },
 ]
 function ask(i) {
@@ -868,7 +868,7 @@ function ask(i) {
     track('answer', `${q.id}:${idx(q.id)}`)
     if (v !== q.other) return ask(i + 1)
     // "Something else" opens a line for the person's own words.
-    box.querySelector('.choices').outerHTML = `<input class="field" id="other" maxlength="60" placeholder="Your style, in your words">
+    box.querySelector('.choices').outerHTML = `<input class="field" id="other" maxlength="60" placeholder="Be specific: hard house, groove techno…">
       <div class="row"><button class="btn btn--go" id="go">Next</button></div>`
     const next = () => { answers[q.id + 'Other'] = $('other').value.trim(); ask(i + 1) }
     $('go').onclick = next
