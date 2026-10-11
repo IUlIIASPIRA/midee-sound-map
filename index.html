@@ -269,7 +269,7 @@ const PARTS = [
   ['85549f24-1a91-4c22-b550-917fbb298210', 'Amber_Synth_Lead_Acid_Bm_128_Analog', 'Synth', true],
   ['9e74c9b6-c332-46cf-91d6-5fdd7a78c580', 'Amber_FX_Glitch_128_Analog', 'FX', false],
   ['be26f11e-4a98-4c8a-9742-fa64c75d96f4', 'Amber_Vox_128_Drum_Rack', 'Vocal', false],
-].map(([id, name, group, tonal]) => ({ id, name, group, tonal, on: false }))
+].map(([id, name, group, tonal]) => ({ id, name, group, tonal, native: tonal ? 3 : null, on: false }))
 
 // The build, one part at a time. zone = the glass to look at. Claims checked
 // on these previews 10.10: the low bass leaves a short gap under each kick;
@@ -378,21 +378,34 @@ const urlOf = (p) => `${STATIC}/${p.id}/ogg/${p.tonal ? `key-${key}/` : ''}${BPM
 // Bm and Random only picks parts written in that key.
 let mp4Only = false
 const mp4Of = (p) => `${STATIC}/${p.id}/render/${BPM}.mp4`
+// A part in its own key plays midee's own render, the file the midee player
+// loops: drums always, and melodic parts while the track is in their key.
+// The OGG key versions are transposed copies, and in their own key they wander
+// off the grid by up to 9 ms inside one loop (Amber's acid lead, measured 11.10):
+// that was the drift Julie heard. Only a part moved to another key plays OGG.
+const ownKey = (p) => !p.tonal || p.native === key
+// Whether this browser decodes OGG at all, tested once on a tiny silent file,
+// so a key change never finds out halfway through.
+const OGG_PROBE = 'T2dnUwACAAAAAAAAAADnRefNAAAAANrgvtQBHgF2b3JiaXMAAAAAAiJWAAAAAAAAAAAAAAAAAAC7AU9nZ1MAAAAAAAAAAAAA50XnzQEAAACEU6xxDjz///////////////+7A3ZvcmJpcwwAAABMYXZmNjEuNy4xMDMBAAAAHAAAAGVuY29kZXI9TGF2YzYxLjE5LjEwMSB2b3JiaXMBBXZvcmJpcxxCQ1YCABAAAIR0mlmqASLMQIaB0JCVAAACAABghCIMMSA0ZCUAABAAACCGkoNoQmvON+c4aJaDplJsTgcnUm2e5KZibs4555xzsjlnjHPOOacoZxaDZkJrzjknMWiWgmZCa84550lsHrSmSmvOOWecczoYZ4RxzjmnSWsepGZjbc45Z0FrmqPmUmzOOSdSbp7U5lJtzjnnnHPOOeecc845p3pxOgfnhHPOOSdqb67lJnRxzjnnk3G6NyeEc84555xzzjnnnHPOOScIDVkJAAABABCEYWMYdwqC9DkaiFGEmIZMetA9OkyCxiCnkHo0OhoppQ5CSWWclNIJQkNWAgCAAAAQQkghhRRSSCGFFFJIIYUYYoghhpxyyimooJJKKqooo8wyyyyzzDLLLLMOO+usww5DDDHE0EorsdRUW4011pp7zrnmIK2V1lprrZRSSimllILQkJUAAAgAAIGQQQYZZBRSSCGFGGLKKaecggoqIDRkJQAABgDAIWeggQYaaKCBBhpooHHGGYgggggiqKSSTDoKKbXYaswx116DDjr3nnvvufgchFJKKaWUUkoppZRSSiklCA1ZCQCAAAAACCGEEFJIIYUUUooxxhxzDjoJJQRCQ1YCAGAAAAwxxBhkkEFIIYUYYoopxxxzDDoIIZRSUmihhVxqiCWWVlqJpaWYaoux1lhz7THW3nvvvffee++99957zoHQkJUAQAQAAIMMIogggowxBiEEhIasBABAAAAQYogxxiCEEFKIIaecgkwy6aSjkAKhISsBACcAAIQRRyRxBBJnoIEIKqkgo8xCLLG11lprrbXWWmuttdZaa6211lprrbXWWmuttdZaay0QGrISAIgAAGCQQQYZRBBBBBlkgNCQlQAACAAAI4xABBmlFGOOOeYYdNBBJx2FFlogNGQlAOAEAEAgoYgyzDAEEVVUUUYVVRRSRymllFJKKaWUUkoppZRSSimllFJK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'
+const oggReady = ctx.decodeAudioData(Uint8Array.from(atob(OGG_PROBE), (c) => c.charCodeAt(0)).buffer)
+  .then(() => true, () => false).then((ok) => { if (!ok) setMp4Only(); return ok })
+function setMp4Only() {
+  mp4Only = true
+  keySel.disabled = true; keySel.title = 'This browser plays the parts in their own key only'; if (typeof drawKey === 'function') drawKey()
+}
 async function fetchDecode(url) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return ctx.decodeAudioData(await res.arrayBuffer())
 }
 async function loadPart(p) {
-  if (!mp4Only) {
+  if (!ownKey(p) && await oggReady) {
     try { p.buffer = await fetchDecode(urlOf(p)) } catch (e) {
       if (String(e).includes('HTTP')) throw new Error(`${p.name}: ${e.message}`)
-      mp4Only = true
+      setMp4Only(); throw new Error('this browser plays the parts in their own key only')
     }
-  }
-  if (mp4Only) {
-    p.buffer = await fetchDecode(mp4Of(p))
-    keySel.disabled = true; keySel.title = 'This browser plays the parts in their own key only'; if (typeof drawKey === 'function') drawKey()
+  } else {
+    try { p.buffer = await fetchDecode(mp4Of(p)) } catch (e) { throw new Error(`${p.name}: ${e.message}`) }
   }
   p.zones = analyse(p.buffer)
 }
@@ -401,15 +414,16 @@ async function loadPart(p) {
 // the planned point anyway, and that part ends up behind the rest (this is
 // what desynced the melodic parts after a key change on a phone, 10.10).
 // The old sound keeps playing until that same moment, so the switch is seamless.
-const LEAD = 0.25, BAR = 4 * 60 / BPM
+const LEAD = 0.25, BAR = 4 * 60 / BPM, LOOP = 8 * BAR
 const ahead = () => ctx.currentTime + LEAD
 function startPart(p, when = ahead()) {
   if (p.src) { const old = p.src; old.onended = () => old.disconnect(); try { old.stop(when) } catch { old.disconnect() } }
   if (!p.gain) { p.gain = ctx.createGain(); p.gain.connect(master) }
   p.gain.gain.value = p.on ? 1 : 0
   const src = ctx.createBufferSource(); src.buffer = p.buffer; src.loop = true; src.connect(p.gain)
-  // loop on whole bars, so a preview a few samples long or short never drifts
-  const bars = Math.max(1, Math.round(p.buffer.duration / BAR)), len = Math.min(bars * BAR, p.buffer.duration)
+  // loop exactly 8 bars, as the midee player does (4 * 8 * 60 / BPM, 15 s at 128),
+  // whatever a decoder adds or trims at the ends of the file
+  const len = Math.min(LOOP, p.buffer.duration)
   src.loopStart = 0; src.loopEnd = len
   const offset = ((when - startAt) % len + len) % len
   src.start(when, offset); p.src = src
@@ -634,7 +648,7 @@ async function swap(p) {
   try {
     const t = await pick(p.group, new Set(PARTS.map((x) => x.id)))
     if (!t) throw new Error('nothing found')
-    const next = { id: t.id, name: t.name, group: p.group, tonal: t.tonal }
+    const next = { id: t.id, name: t.name, group: p.group, tonal: t.tonal, native: t.native }
     await loadPart(next)
     Object.assign(p, next, { fresh: true, on: true })
     if (playing) startPart(p)
@@ -646,12 +660,25 @@ async function swap(p) {
 }
 keySel.onchange = async () => {
   if (mp4Only) { keySel.value = key; drawKey(); return }
+  const was = key
   key = Number(keySel.value); drawKey(); track('key', KEYS[key - 1]); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
   try {
+    if (key !== was && !(await oggReady)) throw new Error('this browser plays the parts in their own key only')
     await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
     if (playing) { const when = ahead(); PARTS.filter((p) => p.tonal).forEach((p) => startPart(p, when)) }
     drawParts(); recompute(); drawIdeas(); msg(`Now in ${KEYS[key - 1]}. Drums stay as they are, everything with notes moved.`)
-  } catch (e) { msg(`Could not change key: ${e.message}`) }
+  } catch (e) {
+    msg(`Could not change key: ${e.message}`)
+    // a browser without OGG stays in the track's own key, with every part back on its own render
+    if (mp4Only && key !== was) {
+      key = was; keySel.value = String(key); drawKey()
+      try {
+        await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
+        if (playing) { const when = ahead(); PARTS.filter((p) => p.tonal).forEach((p) => startPart(p, when)) }
+        drawParts(); recompute(); drawIdeas()
+      } catch {}
+    }
+  }
   busy = false
 }
 // Play / pause. On a phone the sound also stops by itself: the lock screen,
@@ -688,13 +715,13 @@ addEventListener('pointerdown', (e) => {
 // live version each idea becomes a scene of the person's midee project.
 const STORE = 'midee-club-ideas-v1'
 const IDEAS = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || [] } catch { return [] } })()
-const saveIdeas = () => { try { localStorage.setItem(STORE, JSON.stringify(IDEAS.map(({ n, key, parts }) => ({ n, key, parts: parts.map(({ id, name, group, tonal, on }) => ({ id, name, group, tonal, on })) })))) } catch {} }
+const saveIdeas = () => { try { localStorage.setItem(STORE, JSON.stringify(IDEAS.map(({ n, key, parts }) => ({ n, key, parts: parts.map(({ id, name, group, tonal, native, on }) => ({ id, name, group, tonal, native, on })) })))) } catch {} }
 let activeIdea = null
 const sameAsNow = (idea) => idea.key === key && idea.parts.every((s, i) => s.id === PARTS[i].id && s.on === PARTS[i].on)
 function catchIdea(quiet = false) {
   const found = IDEAS.find(sameAsNow)
   if (found) { activeIdea = found; drawIdeas(); if (!quiet) { msg(`This mix is already Idea ${found.n}.`); tipDone('catch') } return found }
-  const idea = { n: IDEAS.length + 1, key, parts: PARTS.map(({ id, name, group, tonal, on, buffer, zones }) => ({ id, name, group, tonal, on, buffer, zones })) }
+  const idea = { n: IDEAS.length + 1, key, parts: PARTS.map(({ id, name, group, tonal, native, on, buffer, zones }) => ({ id, name, group, tonal, native, on, buffer, zones })) }
   IDEAS.push(idea); activeIdea = idea; drawIdeas(); saveIdeas()
   if (!quiet) track('catch', idea.n)
   if (!quiet) { msg(`Caught as Idea ${idea.n}. Now roll the dice on any part, you can always come back to it.`); tipDone('catch') }
