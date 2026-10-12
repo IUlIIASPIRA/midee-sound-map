@@ -836,7 +836,7 @@ const styleSlug = () => { const t = (answers.styleOther || '').toLowerCase().rep
 // confirmed in another browser); the link carries the labels and the ideas' token.
 // midee then emails the demo with the list of ideas. Contract: Admin Midee chat,
 // POST /api/club/ideas → 201 {token}, 7 days. Off until midee is live with it.
-const MIDEE_SIGNUP = false
+const MIDEE_SIGNUP = true
 const MIDEE = 'https://midee.me'
 const keyName = (n) => KEYS[n - 1]
 const nativeOf = (p) => p.native ? keyName(p.native) : ((p.name || '').match(/_([A-G]#?m)_/) || [])[1]
