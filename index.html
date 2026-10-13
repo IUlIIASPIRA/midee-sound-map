@@ -12,8 +12,6 @@
   html, body { margin: 0; height: 100%; background: #000; color: #e7e7ea; font-family: 'DM Sans', system-ui, sans-serif; overflow: hidden; }
   canvas { display: block; }
   button, select { font: inherit; color: inherit; }
-  .hud { position: fixed; top: 20px; left: 24px; font: 12px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); pointer-events: none; }
-  .hud b { color: #e7e7ea; font-weight: 500; }
 
   /* the track: header, parts, buttons */
   .deck { position: fixed; top: 48px; left: 24px; width: 330px; max-height: calc(100vh - 72px); overflow: auto; padding: 14px; border-radius: 12px;
@@ -52,6 +50,15 @@
          font: 600 12px/1.35 'DM Sans', system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.5); cursor: pointer; transition: opacity .2s; }
   .tip em { display: block; margin-top: 5px; font: 600 10px/1 var(--mono); font-style: normal; letter-spacing: 1px; opacity: .55; }
   .tip b { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,.15); font-weight: 700; }
+  .tip__dots { margin-left: 6px; letter-spacing: 3px; }
+  .tip__next { display: block; margin-top: 6px; font: 500 11px/1.3 'DM Sans', system-ui, sans-serif; font-style: normal; opacity: .7; }
+  .steps3 { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+  .steps3 li { display: flex; align-items: center; gap: 8px; font: 500 13px/1.3 'DM Sans', system-ui, sans-serif; color: var(--dim); }
+  .steps3 li span { flex: 0 0 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); display: grid; place-items: center; font: 600 10px/1 var(--mono); }
+  .steps3 li.is-now { color: #fde047; }
+  .steps3 li.is-now span { border-color: #fde047; background: #fde047; color: #000; }
+  .steps3 li.is-done { color: #8b8b93; text-decoration: line-through; }
+  .steps3 li.is-done span { border-color: #5eead4; color: #5eead4; }
   .tip small { display: block; font: 600 10px/1 var(--mono); letter-spacing: 1.2px; margin-bottom: 4px; opacity: .6; }
   .tip::after { content: ''; position: absolute; left: var(--ax, 50%); bottom: -6px; width: 12px; height: 12px; margin-left: -6px; background: #fde047; transform: rotate(45deg); }
   .tip--below::after { bottom: auto; top: -6px; }
@@ -106,6 +113,27 @@
   .sheet p { color: var(--dim); font-size: 14px; line-height: 1.45; margin: 8px 0; }
   .sheet ol { margin: 12px 0; padding-left: 22px; font-size: 14px; line-height: 1.6; }
   .sheet ol small { color: var(--dim); font-family: var(--mono); font-size: 11px; }
+  /* 13.10: the room turns by itself at the start, and this says it can be turned by hand */
+  .turn { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 3; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(253,224,71,.5);
+          background: rgba(0,0,0,.6); backdrop-filter: blur(6px); color: #e7e7ea; font: 11px/1 var(--mono); letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+          pointer-events: none; transition: opacity .6s; }
+  .turn__i { display: inline-block; margin-right: 8px; color: #fde047; animation: turn 2.4s linear infinite; }
+  .turn__z { display: inline-block; margin-right: 8px; color: #fde047; animation: zoom 1.6s ease-in-out infinite; }
+  @keyframes zoom { 50% { transform: scale(1.35); } }
+  /* 13.10: the gesture itself, drawn as touch points that move the way a finger or the wheel would */
+  .gest { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+  .gest__dot { position: absolute; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: #fde047;
+               box-shadow: 0 0 0 6px rgba(253,224,71,.22), 0 0 18px rgba(253,224,71,.6); }
+  .gest__dot--trail { width: 16px; height: 16px; margin: -8px 0 0 -8px; box-shadow: none; }
+  .gest__track { position: absolute; left: 0; top: 0; width: 38px; margin-left: -19px; border: 2px solid rgba(253,224,71,.8); border-radius: 19px; background: rgba(0,0,0,.45); }
+  .turn--out { opacity: 0; }
+  .turn--band { border-color: #fde047; color: #fde047; pointer-events: auto; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
+  .turn--band[hidden] { display: none; }
+  .turn--band b { color: #fff; font-weight: 600; }
+  .turn--band:hover { background: rgba(253,224,71,.14); }
+  .turn--band:focus-visible { outline: 2px solid #fde047; outline-offset: 3px; }
+  .chip__x { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #fde047; color: #000; font-size: 13px; line-height: 1; }
+  @keyframes turn { to { transform: rotate(360deg); } }
   .note { position: fixed; left: 50%; top: 20px; transform: translateX(-50%); font: 10px/1 var(--mono); letter-spacing: 1px; color: #55555c; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
   [hidden] { display: none !important; }
 
@@ -128,6 +156,11 @@
   .spk__now b { display: block; color: var(--dim); font-weight: 400; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 4px; }
   .spk__now i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
   .spk__now div { overflow-wrap: anywhere; }
+  .spk__solo { width: 100%; margin-top: 12px; color: #e7e7ea; }
+  .z { cursor: pointer; }
+  .z:hover .z__glass { border-color: rgba(255,255,255,.7); }
+  .z--pick .z__glass { border-color: #fde047; box-shadow: 0 0 0 3px rgba(253,224,71,.3); }
+  .z--pick .z__t { color: #fde047; }
 
   /* the flow inside the sheet */
   .sheet { z-index: 6; }
@@ -147,6 +180,8 @@
 
   @media (max-width: 900px) {
     .note { display: none; }
+    .turn { top: 18px; font-size: 9px; padding: 7px 11px; }
+    .turn--band { top: 12px; font-size: 10px; padding: 6px 7px 6px 12px; }
     .deck { top: auto; bottom: 8px; left: 8px; right: 8px; width: auto; max-height: 56vh; padding: 10px 12px 12px; background: rgba(0,0,0,.72); }
     .deck__handle { display: flex; justify-content: space-between; width: 100%; padding: 2px 2px 10px; border: 0; background: none; cursor: pointer;
                     font: 11px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); }
@@ -169,8 +204,9 @@
 </script>
 </head>
 <body>
-  <div class="hud">midee · <b>sound map</b> · in the club</div>
-  <div class="note">real midee previews · drag to turn the room · tap a speaker</div>
+  <div class="gest" id="gest" hidden></div>
+  <div class="turn" id="turn" hidden><span class="turn__i">↻</span>Drag to turn the room · tap a speaker or a glass</div>
+  <button class="turn turn--band" id="bandLine" type="button" hidden></button>
 
   <div class="spk" id="spk" hidden>
     <button class="spk__x" id="spkX" aria-label="Close">×</button>
@@ -178,6 +214,7 @@
     <div class="spk__h" id="spkH"></div>
     <p class="spk__t" id="spkT"></p>
     <div class="spk__now" id="spkNow"></div>
+    <button class="btn spk__solo" id="spkSolo">Hear only this</button>
     <p class="spk__t spk__tip" id="spkTip"></p>
   </div>
 
@@ -363,7 +400,24 @@ function analyse(buffer) {
 const ctx = new (window.AudioContext || window.webkitAudioContext)()
 const master = ctx.createGain(); master.gain.value = 0.55
 const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 4
-master.connect(comp).connect(ctx.destination)
+// The band filter: open by default; a glass or a speaker card can let through only its own
+// frequencies, the way a club system splits the sound (13.10, Julie: "like the subs").
+const bandHP = ctx.createBiquadFilter(); bandHP.type = 'highpass'; bandHP.frequency.value = 10
+const bandLP = ctx.createBiquadFilter(); bandLP.type = 'lowpass'; bandLP.frequency.value = 22000
+master.connect(bandHP).connect(bandLP).connect(comp).connect(ctx.destination)
+let soloBand = null
+function setBand(band, label = '') {
+  soloBand = band
+  // 13.10 (Julie): while one band plays alone, a filter chip at the top says which one;
+  // tapping the chip switches the filter off (handler next to the card code)
+  const line = document.getElementById('bandLine')
+  if (line) {
+    line.hidden = !band
+    if (band) { line.innerHTML = `Only <b>${label}</b><span class="chip__x" aria-hidden="true">×</span>`; line.setAttribute('aria-label', `Only ${label} is playing. Tap to hear everything`); turnOff() }
+  }
+  bandHP.frequency.setTargetAtTime(band ? Math.max(10, band[0]) : 10, ctx.currentTime, 0.03)
+  bandLP.frequency.setTargetAtTime(band ? band[1] : 22000, ctx.currentTime, 0.03)
+}
 let startAt = 0, playing = false
 // 13.10 (Julie): every part plays midee's own render, the file the midee player
 // loops, and only in its own key. The OGG key versions are gone: the track stays
@@ -378,24 +432,33 @@ async function loadPart(p) {
   try { p.buffer = await fetchDecode(mp4Of(p)) } catch (e) { throw new Error(`${p.name}: ${e.message}`) }
   p.zones = analyse(p.buffer)
 }
-// Start (or restart) one part in step with the others, at a moment far enough
-// ahead that a busy phone still makes it: a start that arrives late plays from
-// the planned point anyway, and that part ends up behind the rest (this is
-// what desynced the melodic parts after a key change on a phone, 10.10).
-// The old sound keeps playing until that same moment, so the switch is seamless.
-const LEAD = 0.25, BAR = 4 * 60 / BPM, LOOP = 8 * BAR
-const ahead = () => ctx.currentTime + LEAD
-function startPart(p, when = ahead()) {
-  if (p.src) { const old = p.src; old.onended = () => old.disconnect(); try { old.stop(when) } catch { old.disconnect() } }
-  if (!p.gain) { p.gain = ctx.createGain(); p.gain.connect(master) }
-  p.gain.gain.value = p.on ? 1 : 0
-  const src = ctx.createBufferSource(); src.buffer = p.buffer; src.loop = true; src.connect(p.gain)
+// 13.10 (Julie): switching sounds works exactly like the midee web player
+// (client-app daw/services/track-player.ts): a new sound starts right away from the
+// same point of the loop, offset = (now - startAt) % loop, source.start(0, offset), and
+// fades in over 0.2 s; the old one fades out over the same 0.2 s and only then stops.
+// Muting and unmuting a part is the same 0.2 s linear ramp.
+const FADE = 0.2, BAR = 4 * 60 / BPM, LOOP = 8 * BAR
+function ramp(param, v) {
+  const t = ctx.currentTime
+  param.cancelScheduledValues(t); param.setValueAtTime(param.value, t); param.linearRampToValueAtTime(v, t + FADE)
+}
+function startPart(p, when = ctx.currentTime) {
+  if (p.src) {
+    const old = p.src, og = p.fade, end = () => { old.disconnect(); og.disconnect() }
+    ramp(og.gain, 0); old.onended = end
+    try { old.stop(ctx.currentTime + FADE) } catch { end() }
+  }
+  if (!p.gain) { p.gain = ctx.createGain(); p.gain.gain.value = p.on ? 1 : 0; p.gain.connect(master) }
+  ramp(p.gain.gain, p.on ? 1 : 0)
+  // each source has its own gain, so the old and the new one can cross
+  const fade = ctx.createGain(); fade.gain.setValueAtTime(0, when); fade.gain.linearRampToValueAtTime(1, when + FADE); fade.connect(p.gain)
+  const src = ctx.createBufferSource(); src.buffer = p.buffer; src.loop = true; src.connect(fade)
   // loop exactly 8 bars, as the midee player does (4 * 8 * 60 / BPM, 15 s at 128),
   // whatever a decoder adds or trims at the ends of the file
   const len = Math.min(LOOP, p.buffer.duration)
   src.loopStart = 0; src.loopEnd = len
   const offset = ((when - startAt) % len + len) % len
-  src.start(when, offset); p.src = src
+  src.start(when, offset); p.src = src; p.fade = fade
 }
 const playStep = () => playing && ctx.state === 'running' && ctx.currentTime >= startAt ? Math.floor((ctx.currentTime - startAt) / STEP) : -1
 
@@ -440,7 +503,7 @@ function drawParts() {
     row.innerHTML = `<i style="background:${COLORS[p.group]}"></i><div class="part__n">${midName(p)}<small>${tags(p)}</small></div>
       <button title="Mute / unmute">${p.on ? '◉' : '○'}</button><button class="dice" title="Swap for a random ${p.group.toLowerCase()} from the library"${full ? '' : ' style="visibility:hidden" tabindex="-1"'}>🎲</button>`
     const [mute, dice] = row.querySelectorAll('button')
-    mute.onclick = () => { p.on = !p.on; if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02); drawParts(); recompute(); drawHandle(); if (stage >= PARTS.length) drawIdeas() }
+    mute.onclick = () => { p.on = !p.on; if (p.gain) ramp(p.gain.gain, p.on ? 1 : 0); drawParts(); recompute(); drawHandle(); if (stage >= PARTS.length) drawIdeas() }
     dice.onclick = () => swap(p)
     p.fresh = false; p.bar = row.querySelector('i')
     partsEl.append(row)
@@ -499,8 +562,11 @@ let tipLoop = 0
 function setTip(step) {
   tipStep = step
   cancelAnimationFrame(tipLoop)
-  if (!step) { $('tip').hidden = true; lightTip(); return }
-  $('tip').innerHTML = `<small>${TIPS[step][0]}</small>${TIPS[step][1]}<em>${step === 'get' ? 'tap to close' : 'tap to skip'}</em>`
+  if (!step) { $('tip').hidden = true; lightTip(); drawSteps(); return }
+  const n = ORDER.indexOf(step)
+  $('tip').innerHTML = `<small>${TIPS[step][0]} <span class="tip__dots">${ORDER.map((_, i) => i < n ? '✓' : i === n ? '●' : '○').join(' ')}</span></small>${TIPS[step][1]}`
+    + `${step === 'get' ? '' : `<i class="tip__next">Next: ${STEP_NAMES[ORDER[n + 1]].toLowerCase()}</i>`}<em>${step === 'get' ? 'tap to close' : 'tap to skip'}</em>`
+  drawSteps()
   lightTip()
   const el = tipTarget()
   if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -510,9 +576,19 @@ function setTip(step) {
 }
 // steps only go forward: catching after a dice roll goes straight to the project
 const ORDER = ['catch', 'dice', 'get']
+// 13.10: the three steps after the build stay listed in the coach box, with the one to do now
+// marked, so nobody stops at the first one or skips the dice.
+const STEP_NAMES = { catch: 'Catch this mix as an idea', dice: 'Roll the dice on any part', get: 'Get your first Ableton project' }
+function stepsList() {
+  const done = { catch: IDEAS.length > 0, dice: rolled, get: false }
+  const now = tipStep || ORDER.find((k) => !done[k])
+  return `<ol class="steps3">${ORDER.map((k, i) => `<li class="${done[k] ? 'is-done' : k === now ? 'is-now' : ''}"><span>${done[k] ? '✓' : i + 1}</span>${STEP_NAMES[k]}</li>`).join('')}</ol>`
+}
+const drawSteps = () => { if (stage >= PARTS.length) $('ctext').innerHTML = FINAL + stepsList() }
 let rolled = false
 const tipDone = (step) => {
   if (step === 'dice') rolled = true
+  drawSteps()
   if (tipStep !== step) return
   const next = ORDER[ORDER.indexOf(step) + 1] || null
   setTip(next === 'dice' && rolled ? 'get' : next)
@@ -534,7 +610,7 @@ function revealEnd() {
   setTimeout(() => deck.classList.remove('deck--reveal'), 900)
 }
 async function goTo(n, keep = false) {
-  if (!playing) { await ctx.resume(); const when = ahead(); startAt = when; playing = true; PARTS.forEach((p) => startPart(p, when)) }
+  if (!playing) { await ctx.resume(); const when = ctx.currentTime; startAt = when; playing = true; PARTS.forEach((p) => startPart(p, when)) }
   else if (ctx.state !== 'running') { userPaused = false; await ctx.resume() }
   drawPlay()
   stage = Math.max(0, Math.min(PARTS.length, n))
@@ -544,7 +620,7 @@ async function goTo(n, keep = false) {
     if (keep) return
     const was = p.on; p.on = i < stage
     if (p.on && !was && i === stage - 1) p.fresh = true
-    p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02)
+    ramp(p.gain.gain, p.on ? 1 : 0)
   })
   drawStage(); drawParts(); recompute()
   if (stage >= PARTS.length) revealEnd()
@@ -553,7 +629,7 @@ function drawStage() {
   drawHandle()
   const done = stage >= PARTS.length
   $('cstep').textContent = done ? 'Your track · 10 of 10' : `Build a track · step ${stage} of ${PARTS.length}`
-  $('ctext').innerHTML = done ? FINAL : stage === 0 ? STAGE0 : LESSONS[stage - 1].text
+  $('ctext').innerHTML = done ? FINAL + stepsList() : stage === 0 ? STAGE0 : LESSONS[stage - 1].text
   $('next').hidden = done; $('next').textContent = done ? '' : LESSONS[stage].add
   $('back').disabled = stage === 0
   // At the end the steps row (← ▶) gives way to one row: ← Play Random.
@@ -677,11 +753,11 @@ async function recallIdea(idea) {
     try { await Promise.all(missing.map(loadPart)) } catch (e) { busy = false; msg(`Could not load Idea ${idea.n}: ${e.message}`); return }
     busy = false
   }
-  const when = ahead()
+  const when = ctx.currentTime
   idea.parts.forEach((s, i) => {
     const p = PARTS[i], changed = p.id !== s.id
     Object.assign(p, s)
-    if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02)
+    if (p.gain) ramp(p.gain.gain, p.on ? 1 : 0)
     if (changed && playing) startPart(p, when)
   })
   activeIdea = idea; allRows = true
@@ -742,7 +818,7 @@ function showPrice() {
   screen(`
     <div class="sheet__step">Last question</div>
     <div class="sheet__h">What would the full project be worth to you?</div>
-    <p>All ${PARTS.length} parts of the track you built, in any key, with your ideas as scenes.</p>
+    <p>All ${PARTS.length} parts of the track you built, with your ideas as scenes.</p>
     ${choices(PRICES, 'choices--price')}
     <div class="choices"><button class="btn" data-i="3">I wouldn't pay for it</button></div>`,
   () => onChoice(list, (v) => { answers.price = v; track('price', idx('price')); MIDEE_SIGNUP ? toMidee() : showEmail() }))
@@ -775,9 +851,23 @@ function ideasBody() {
       parts: d.parts.slice(0, 32).map((p) => ({ id: p.id, name: p.name, group: p.group, tonal: !!p.tonal,
         ...(p.tonal && KEYS.includes(nativeOf(p)) && { nativeKey: nativeOf(p) }), on: !!p.on })) })) }
 }
+// 13.10: back from midee.me (Safari keeps the page as it was left), the page was stuck on
+// "Taking you to midee…". Now the way back shows where the person is and a button to midee;
+// and if the move itself has not happened within 3 s, the same button shows up here.
+let mideeUrl = null
+const goBtn = (url) => `<a class="btn btn--go" href="${esc(url)}" style="display:block;text-align:center;text-decoration:none;margin-top:14px">Open midee</a>`
+function showOnMidee() {
+  screen(`<div class="sheet__step">Your free demo</div><div class="sheet__h">You're on midee now.</div>
+    <p>If you haven't finished signing up, open midee again. The demo comes to your inbox with your ideas.</p>
+    ${goBtn(mideeUrl)}<div class="row" style="margin-top:12px">${closeBtn}</div>`)
+}
+addEventListener('pageshow', (e) => { if (mideeUrl && e.persisted) showOnMidee() })
+document.addEventListener('visibilitychange', () => {
+  if (mideeUrl && document.visibilityState === 'visible' && $('mideeWait')) showOnMidee()
+})
 async function toMidee() {
-  screen(`<div class="sheet__step">Your free demo</div><div class="sheet__h">Taking you to midee…</div>
-    <p>Make a free midee account, and the demo comes to your inbox with your ideas.</p>`)
+  screen(`<div class="sheet__step">Your free demo</div><div class="sheet__h" id="mideeWait">Taking you to midee…</div>
+    <p>Make a free midee account, and the demo comes to your inbox with your ideas.</p><div id="mideeSlow"></div>`)
   let token = ''
   try {
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000)
@@ -790,7 +880,9 @@ async function toMidee() {
   if (styleSlug()) q.set('utm_term', styleSlug().slice(1))
   if (token) q.set('club_ideas', token)
   track('midee', token ? 'ideas' : 'no_ideas')
-  location.assign(`${MIDEE}/club?${q}`)
+  mideeUrl = `${MIDEE}/club?${q}`
+  setTimeout(() => { const slow = $('mideeSlow'); if (slow && $('mideeWait')) slow.innerHTML = goBtn(mideeUrl) }, 3000)
+  location.assign(mideeUrl)
 }
 
 function showEmail() {
@@ -939,6 +1031,97 @@ function frameCamera() {
   camera.updateProjectionMatrix()
 }
 frameCamera()
+// 13.10 (Julie): the intro teaches the gestures. The camera flies in from far away, where the
+// whole room is small, while the hint says how to zoom; then it zooms out and back once, so it is
+// clear the zoom is in the person's hands; then it swings left and right while the hint says how
+// to turn the room. Each hint replaces the last in the same place at the top. Any touch, drag or
+// scroll takes over. Afterwards the person can zoom out as far as the intro started.
+let intro = null, turned = false
+// timed in bars of the track (1.875 s at 128 BPM): fly-in 1 bar, zoom 1 bar, swing 2 bars
+const AXIS_Y = new THREE.Vector3(0, 1, 0), FLY = BAR, ZOOM = BAR, SWING = 2 * BAR
+// ?introAt=2.5 holds the intro at that second, for screenshots
+const INTRO_AT = new URLSearchParams(location.search).get('introAt')
+// the fly-in moves at once and slows into place; the zoom eases both ways
+const easeOut = (x) => 1 - Math.pow(1 - x, 3)
+const easeInOut = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+// a touch screen pinches, a mouse scrolls (?touch shows the phone wording in a desktop browser, for screenshots)
+const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 || new URLSearchParams(location.search).has('touch')
+const HINTS = {
+  zoom: () => `<span class="turn__z">±</span>${TOUCH ? 'Pinch to zoom' : 'Scroll to zoom in and out'}`,
+  turn: () => '<span class="turn__i">↻</span>Drag to turn the room · tap a speaker or a glass',
+}
+function showHint(kind) {
+  const el = $('turn')
+  if (el.dataset.kind === kind) return
+  el.dataset.kind = kind; el.innerHTML = HINTS[kind](); el.classList.remove('turn--out'); el.hidden = false
+}
+// the touch points: a bright dot where the finger is and a fading trail of where it has just been
+const TRAIL = 6
+let gestMode = null, gestPast = []
+function drawGest(mode, points, track) {
+  const el = $('gest')
+  if (mode !== gestMode) {
+    gestMode = mode; gestPast = points.map(() => [])
+    el.innerHTML = (track ? '<div class="gest__track"></div>' : '') + points.map(() =>
+      Array.from({ length: TRAIL }, () => '<div class="gest__dot gest__dot--trail"></div>').join('') + '<div class="gest__dot"></div>').join('')
+  }
+  el.hidden = false
+  if (track) { const tr = el.querySelector('.gest__track'); tr.style.transform = `translate(${track.x}px, ${track.y}px)`; tr.style.height = `${track.h}px` }
+  const dots = el.querySelectorAll('.gest__dot')
+  points.forEach((p, i) => {
+    const past = gestPast[i]; past.unshift(p); past.length = Math.min(past.length, TRAIL * 3)
+    for (let k = 0; k < TRAIL; k++) {
+      const q = past[Math.min(past.length - 1, (k + 1) * 3)], d = dots[i * (TRAIL + 1) + k]
+      d.style.transform = `translate(${q.x}px, ${q.y}px)`; d.style.opacity = (0.45 * (1 - k / TRAIL)).toFixed(2)
+    }
+    dots[i * (TRAIL + 1) + TRAIL].style.transform = `translate(${p.x}px, ${p.y}px)`
+  })
+}
+function hideGest() { $('gest').hidden = true; gestMode = null }
+// where the gesture is drawn: a little below the middle of the room as it stands on screen
+function gestCentre() {
+  const v = controls.target.clone().project(camera)
+  return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight + (innerWidth < 900 ? 170 : 130) }
+}
+function startIntro() {
+  if (turned) return
+  const base = camera.position.clone().sub(controls.target)
+  // a phone already stands further back, so it needs less distance to show the whole room
+  const narrow = innerWidth < 900, far = base.clone().multiplyScalar(narrow ? 2.2 : 3.2); far.y += narrow ? 8 : 14
+  controls.maxDistance = Math.max(controls.maxDistance, far.length() + 1)   // and the person can go there too
+  intro = { t0: performance.now(), base, far }
+  showHint('zoom'); stepIntro()
+}
+function endIntro() { intro = null; hideGest() }
+function turnOff() { turned = true; endIntro(); $('turn').hidden = true }
+function hideTurn() { $('turn').classList.add('turn--out'); setTimeout(() => { $('turn').hidden = true }, 700) }
+function stepIntro() {
+  if (!intro) return
+  const t = INTRO_AT === null ? (performance.now() - intro.t0) / 1000 : +INTRO_AT
+  const at = (v) => camera.position.copy(controls.target).add(v)
+  if (t < FLY) { at(intro.far.clone().lerp(intro.base, easeOut(t / FLY))); return }
+  const z = t - FLY, c = gestCentre()
+  if (z < ZOOM) {
+    const f = Math.sin(Math.PI * easeInOut(z / ZOOM))           // 0 → 1 → 0: out and back in
+    at(intro.base.clone().multiplyScalar(1 + 0.45 * f))
+    // fingers come together to zoom out and spread to zoom in; the wheel rolls down to zoom out and up to zoom in
+    if (TOUCH) { const d = 36 * (1 - f) + 14; drawGest('pinch', [{ x: c.x - d, y: c.y + d }, { x: c.x + d, y: c.y - d }]) }
+    else drawGest('wheel', [{ x: c.x, y: c.y - 28 + 56 * f }], { x: c.x, y: c.y - 46, h: 92 })
+    return
+  }
+  const s = z - ZOOM
+  showHint('turn')
+  if (s >= SWING) { at(intro.base); endIntro(); setTimeout(hideTurn, 2000); return }
+  const ease = Math.sin(Math.PI * s / SWING)                   // starts and ends still
+  const a = 0.42 * ease * Math.sin(2 * Math.PI * s / SWING)
+  at(intro.base.clone().applyAxisAngle(AXIS_Y, a))
+  // dragging right turns the camera the other way round the room, so the point moves against the angle
+  drawGest('drag', [{ x: c.x - 110 * a / 0.42, y: c.y }])
+}
+const takeOver = () => { if (!turned) { turned = true; endIntro(); hideTurn(); track('turn') } }
+renderer.domElement.addEventListener('pointerdown', takeOver)
+renderer.domElement.addEventListener('pointermove', (e) => { if (e.buttons) takeOver() })
+renderer.domElement.addEventListener('wheel', takeOver, { passive: true })
 
 let seed = 13
 const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
@@ -1026,6 +1209,23 @@ const SPEAKERS = {
     zones: [1, 2, 3],
   },
 }
+SPEAKERS.sub.band = [30, 120]; SPEAKERS.sub.only = 'the subs'
+SPEAKERS.top.band = [120, 16000]; SPEAKERS.top.only = 'the tops'
+// Each glass opens the same card: what this band is, which parts fill it right now, and a
+// button that lets only this band through.
+const GLASS = [
+  ['30–120 Hz', 'The lowest notes: the kick and the bottom of the bass. In the club the subs play this, and you feel it in your chest more than you hear it.',
+   'Only one sound should lead here at a time. When two fight, the glass turns muddy.'],
+  ['120–600 Hz', 'Warmth and weight: the body of the bass, the snare and the lower notes of the chords. The tops above the booth play it.',
+   'Too much here and the track sounds boxy. Too little and it feels thin.'],
+  ['600 Hz–6 kHz', 'Snap, chords and melody. Most of what you recognise in a track lives here.',
+   'Chords, pluck and lead share this glass, so short notes leave room for each other.'],
+  ['6–16 kHz', 'Hats, cymbals and shine. It makes the track feel open.',
+   'Without it the track feels closed, even when every other glass is full.'],
+]
+ZONES.forEach((z, i) => {
+  SPEAKERS['z' + i] = { step: `Glass · ${z.t} · ${GLASS[i][0]}`, h: z.t, t: GLASS[i][1], tip: GLASS[i][2], zones: [i], band: [z.lo, z.hi], only: z.t }
+})
 let spkKind = null
 function drawSpk() {
   if (!spkKind) return
@@ -1038,10 +1238,31 @@ function drawSpk() {
   $('spkNow').innerHTML = now.length
     ? `<b>Playing here now</b>${now.map(({ p, v }) => `<div><i style="background:${COLORS[p.group]}"></i>${midName(p)} · ${Math.round(100 * v / total)}%</div>`).join('')}`
     : '<b>Playing here now</b><div style="color:var(--dim)">Nothing yet. Add a part.</div>'
+  $('spkSolo').textContent = soloBand === k.band ? 'Hear everything' : `Hear only ${k.only}`
+  ZONES.forEach((z, i) => z.el.classList.toggle('z--pick', k.zones.includes(i)))
   $('spk').hidden = false; document.body.classList.add('spk-open')
 }
-const closeSpk = () => { spkKind = null; $('spk').hidden = true; document.body.classList.remove('spk-open') }
+const closeSpk = () => {
+  spkKind = null; $('spk').hidden = true; document.body.classList.remove('spk-open')
+  setBand(null); ZONES.forEach((z) => z.el.classList.remove('z--pick'))
+}
+const soloOn = (kind) => { const k = SPEAKERS[kind]; setBand(k.band, k.only) }
+$('spkSolo').onclick = () => { const k = SPEAKERS[spkKind]; if (!k) return; soloBand === k.band ? setBand(null) : soloOn(spkKind); track('band', spkKind); drawSpk() }
+// A glass is a switch: the first tap plays only its band and opens its card, the second tap
+// brings everything back and closes the card, so the screen is as it was before the tap.
+// A speaker opens its card; tapping the same speaker again closes it.
+function openSpk(kind) {
+  if (spkKind === kind) { closeSpk(); return }
+  if (spkKind) closeSpk()
+  spkKind = kind; track('card', kind)
+  if (kind[0] === 'z') soloOn(kind)
+  else turnOff()
+  drawSpk()
+}
+ZONES.forEach((z, i) => { z.el.onclick = (e) => { e.stopPropagation(); openSpk('z' + i) } })
 $('spkX').onclick = closeSpk
+// the chip at the top is the filter's off switch: the whole track again, the card closes
+$('bandLine').onclick = () => { track('band', 'off'); closeSpk() }
 {
   const ray = new THREE.Raycaster(), ptr = new THREE.Vector2()
   const targets = [...subs.map((s) => [s.glow, 'sub']), ...tops.map((t) => [t.glow, 'top'])]
@@ -1056,8 +1277,7 @@ $('spkX').onclick = closeSpk
     const hit = ray.intersectObjects(targets.map(([m]) => m))[0]
     // on a phone a tap on the empty floor closes the card and brings the deck back
     if (!hit) { if (spkKind && !matchMedia('(min-width: 901px)').matches) closeSpk(); return }
-    spkKind = targets.find(([m]) => m === hit.object)[1]
-    drawSpk()
+    openSpk(targets.find(([m]) => m === hit.object)[1])
   })
 }
 
@@ -1154,7 +1374,7 @@ function tick() {
   }
   for (const t of tops) t.glow.material.opacity = 0.06 + 0.7 * Math.min(1, hi)
   drawGlasses(st)
-  controls.update(); renderer.render(scene, camera); requestAnimationFrame(tick)
+  stepIntro(); controls.update(); renderer.render(scene, camera); requestAnimationFrame(tick)
 }
 tick()
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); frameCamera() })
@@ -1170,7 +1390,9 @@ Promise.all(PARTS.map(loadPart)).then(() => {
   drawIdeas()
   msg('Amber: ten parts of one midee track, real previews from the library.')
 }).catch((e) => { $('next').textContent = 'Could not load'; $('enter').textContent = 'Could not load the club'; msg(e.message) })
-$('enter').onclick = () => { track('enter'); $('welcome').hidden = true; goTo(1) }
+$('enter').onclick = () => { track('enter'); startIntro(); $('welcome').hidden = true; goTo(1) }
+// ?audioTest opens the player to the console, to measure that the parts stay in step
+if (new URLSearchParams(location.search).has('audioTest')) window.__club = { ctx, PARTS, startPart, ramp, camera, controls, get intro() { return intro }, get startAt() { return startAt } }
 </script>
 </body>
 </html>
