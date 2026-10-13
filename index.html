@@ -21,19 +21,6 @@
   .deck__tag { font: 11px/1 var(--mono); letter-spacing: 1.5px; color: #000; background: #fde047; display: inline-block; padding: 5px 7px; }
   .deck__t { font: 600 22px/1.1 var(--mono); letter-spacing: 2px; margin: 10px 0 6px; }
   .deck__meta { display: flex; gap: 8px; align-items: center; font: 12px/1 var(--mono); letter-spacing: 1px; color: var(--dim); text-transform: uppercase; }
-  /* the key: our own list, so it opens dark like the rest of the deck (a native select opens white) */
-  .keypick { position: relative; }
-  .keypick__btn { background: #111; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font: 12px/1 var(--mono); color: #e7e7ea; cursor: pointer; }
-  .keypick__btn::after { content: ' ▾'; color: var(--dim); }
-  .keypick__btn:hover:not(:disabled), .keypick__btn[aria-expanded="true"] { border-color: #fde047; }
-  .keypick__btn:disabled { opacity: .5; cursor: default; }
-  .keypick__pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, 52px); gap: 4px; padding: 6px;
-                  background: #0b0b0d; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.6); }
-  .keypick__pop[hidden] { display: none; }
-  .keypick__pop button { background: rgba(255,255,255,.04); border: 1px solid transparent; border-radius: 6px; padding: 8px 0; font: 12px/1 var(--mono); color: #e7e7ea; cursor: pointer; text-transform: none; }
-  .keypick__pop button:hover { background: rgba(255,255,255,.1); }
-  .keypick__pop button[aria-current="true"] { background: #fde047; color: #000; }
-  .deck__meta select { background: #111; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font: 12px/1 var(--mono); color: #e7e7ea; }
   .parts { display: grid; gap: 4px; margin: 14px 0 12px; }
   /* Catch idea and Get your project stay pinned to the bottom of the deck on a computer:
      in a low window (1200×650, Julie 12.10) the deck scrolled and Get sat below its edge
@@ -199,11 +186,7 @@
     <div class="deck__more">
       <span class="deck__tag">midee composition</span>
       <div class="deck__t">AMBER</div>
-      <div class="deck__meta">Techno · 128 BPM · key
-        <select id="key" aria-label="Key" hidden></select>
-        <span class="keypick"><button class="keypick__btn" id="keybtn" aria-haspopup="true" aria-expanded="false" aria-label="Key"></button>
-          <span class="keypick__pop" id="keypop" hidden></span></span>
-      </div>
+      <div class="deck__meta">Techno · 128 BPM · Bm</div>
       <div class="parts" id="parts"></div>
     </div>
     <div class="coach">
@@ -241,7 +224,7 @@
       <div class="welcome__h">Build a techno track.<br>Take it home as your Ableton project.</div>
       <div class="coach">
         <p class="coach__t">Ten parts of a real track, added one by one. Each time you hear the new part land in the club and see which part of the sound it fills.</p>
-        <p class="coach__t">At the end you change the key, roll the dice on the parts, and download the whole track as a project you can open in Ableton.</p>
+        <p class="coach__t">At the end you roll the dice on the parts, and download the whole track as a project you can open in Ableton.</p>
       </div>
       <div class="coach__step">About 5 minutes · turn the sound on</div>
       <a class="powered" style="margin:-6px 0 14px" href="https://midee.me/?utm_source=club&amp;utm_medium=powered" target="_blank" rel="noopener">All sounds powered by the <b>midee plugin</b> →</a>
@@ -261,7 +244,7 @@ import { OrbitControls } from 'three/addons/OrbitControls.js'
 const STATIC = 'https://midee.fra1.digitaloceanspaces.com/midee/tracks'
 const BPM = 128, STEP = 60 / BPM / 4
 const KEYS = ['Am', 'A#m', 'Bm', 'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m']   // key-N, N = index + 1
-let key = 3                                                                                  // Amber is in B minor
+const key = 3                                                                                // Amber is in B minor, and the club stays there
 const GROUPS = {
   Kick: '8c57ee55-34c4-4093-835f-315f621770a0', Drums: '3d0190c2-ae23-4862-8258-315aa759843e',
   Percussion: 'afffabd2-7bf8-468c-9f8e-8ef8d7c0e345', Bass: 'f72cd6bd-0c6e-426c-864c-93d98c9e292b',
@@ -382,41 +365,17 @@ const master = ctx.createGain(); master.gain.value = 0.55
 const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -10; comp.ratio.value = 4
 master.connect(comp).connect(ctx.destination)
 let startAt = 0, playing = false
-const urlOf = (p) => `${STATIC}/${p.id}/ogg/${p.tonal ? `key-${key}/` : ''}${BPM}.ogg`
-// Some browsers (older iPhones) can't decode OGG. Then every part comes from
-// its MP4 render, which exists only in the part's own key: the key stays at
-// Bm and Random only picks parts written in that key.
-let mp4Only = false
+// 13.10 (Julie): every part plays midee's own render, the file the midee player
+// loops, and only in its own key. The OGG key versions are gone: the track stays
+// in Amber's key, and Random picks only melodic parts written in that key.
 const mp4Of = (p) => `${STATIC}/${p.id}/render/${BPM}.mp4`
-// A part in its own key plays midee's own render, the file the midee player
-// loops: drums always, and melodic parts while the track is in their key.
-// The OGG key versions are transposed copies, and in their own key they wander
-// off the grid by up to 9 ms inside one loop (Amber's acid lead, measured 11.10):
-// that was the drift Julie heard. Only a part moved to another key plays OGG.
-const ownKey = (p) => !p.tonal || p.native === key
-// Whether this browser decodes OGG at all, tested once on a tiny silent file,
-// so a key change never finds out halfway through.
-const OGG_PROBE = 'T2dnUwACAAAAAAAAAADnRefNAAAAANrgvtQBHgF2b3JiaXMAAAAAAiJWAAAAAAAAAAAAAAAAAAC7AU9nZ1MAAAAAAAAAAAAA50XnzQEAAACEU6xxDjz///////////////+7A3ZvcmJpcwwAAABMYXZmNjEuNy4xMDMBAAAAHAAAAGVuY29kZXI9TGF2YzYxLjE5LjEwMSB2b3JiaXMBBXZvcmJpcxxCQ1YCABAAAIR0mlmqASLMQIaB0JCVAAACAABghCIMMSA0ZCUAABAAACCGkoNoQmvON+c4aJaDplJsTgcnUm2e5KZibs4555xzsjlnjHPOOacoZxaDZkJrzjknMWiWgmZCa84550lsHrSmSmvOOWecczoYZ4RxzjmnSWsepGZjbc45Z0FrmqPmUmzOOSdSbp7U5lJtzjnnnHPOOeecc845p3pxOgfnhHPOOSdqb67lJnRxzjnnk3G6NyeEc84555xzzjnnnHPOOScIDVkJAAABABCEYWMYdwqC9DkaiFGEmIZMetA9OkyCxiCnkHo0OhoppQ5CSWWclNIJQkNWAgCAAAAQQkghhRRSSCGFFFJIIYUYYoghhpxyyimooJJKKqooo8wyyyyzzDLLLLMOO+usww5DDDHE0EorsdRUW4011pp7zrnmIK2V1lprrZRSSimllILQkJUAAAgAAIGQQQYZZBRSSCGFGGLKKaecggoqIDRkJQAABgDAIWeggQYaaKCBBhpooHHGGYgggggiqKSSTDoKKbXYaswx116DDjr3nnvvufgchFJKKaWUUkoppZRSSiklCA1ZCQCAAAAACCGEEFJIIYUUUooxxhxzDjoJJQRCQ1YCAGAAAAwxxBhkkEFIIYUYYoopxxxzDDoIIZRSUmihhVxqiCWWVlqJpaWYaoux1lhz7THW3nvvvffee++99957zoHQkJUAQAQAAIMMIogggowxBiEEhIasBABAAAAQYogxxiCEEFKIIaecgkwy6aSjkAKhISsBACcAAIQRRyRxBBJnoIEIKqkgo8xCLLG11lprrbXWWmuttdZaa6211lprrbXWWmuttdZaay0QGrISAIgAAGCQQQYZRBBBBBlkgNCQlQAACAAAI4xABBmlFGOOOeYYdNBBJx2FFlogNGQlAOAEAEAgoYgyzDAEEVVUUUYVVRRSRymllFJKKaWUUkoppZRSSimllFJK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'
-const oggReady = ctx.decodeAudioData(Uint8Array.from(atob(OGG_PROBE), (c) => c.charCodeAt(0)).buffer)
-  .then(() => true, () => false).then((ok) => { if (!ok) setMp4Only(); return ok })
-function setMp4Only() {
-  mp4Only = true
-  keySel.disabled = true; keySel.title = 'This browser plays the parts in their own key only'; if (typeof drawKey === 'function') drawKey()
-}
 async function fetchDecode(url) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return ctx.decodeAudioData(await res.arrayBuffer())
 }
 async function loadPart(p) {
-  if (!ownKey(p) && await oggReady) {
-    try { p.buffer = await fetchDecode(urlOf(p)) } catch (e) {
-      if (String(e).includes('HTTP')) throw new Error(`${p.name}: ${e.message}`)
-      setMp4Only(); throw new Error('this browser plays the parts in their own key only')
-    }
-  } else {
-    try { p.buffer = await fetchDecode(mp4Of(p)) } catch (e) { throw new Error(`${p.name}: ${e.message}`) }
-  }
+  try { p.buffer = await fetchDecode(mp4Of(p)) } catch (e) { throw new Error(`${p.name}: ${e.message}`) }
   p.zones = analyse(p.buffer)
 }
 // Start (or restart) one part in step with the others, at a moment far enough
@@ -465,37 +424,21 @@ function recompute() {
 
 // ================= UI =================
 const $ = (id) => document.getElementById(id)
-const keySel = $('key')
-KEYS.forEach((k, i) => keySel.add(new Option(k, i + 1)))
-keySel.value = key
-// The visible key picker drives the hidden select, so every place that reads
-// or sets keySel keeps working; drawKey() mirrors it back.
-const keyBtn = $('keybtn'), keyPop = $('keypop')
-KEYS.forEach((k, i) => { const b = document.createElement('button'); b.textContent = k; b.dataset.k = i + 1; keyPop.append(b) })
-function drawKey() {
-  keyBtn.textContent = KEYS[Number(keySel.value) - 1]
-  keyBtn.disabled = keySel.disabled; keyBtn.title = keySel.title
-  keyPop.querySelectorAll('button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.k === keySel.value)))
-}
-const openKeys = (on) => { keyPop.hidden = !on; keyBtn.setAttribute('aria-expanded', String(on)); if (on) drawKey() }
-keyBtn.onclick = (e) => { e.stopPropagation(); openKeys(keyPop.hidden) }
-keyPop.onclick = (e) => {
-  const b = e.target.closest('button'); if (!b) return
-  e.stopPropagation(); openKeys(false)
-  if (b.dataset.k !== keySel.value) { keySel.value = b.dataset.k; keySel.dispatchEvent(new Event('change')) }
-}
-addEventListener('click', () => openKeys(false))
-addEventListener('keydown', (e) => { if (e.key === 'Escape') openKeys(false) })
-drawKey()
 const partsEl = $('parts')
+// An idea opened from the list shows all its parts, also in the middle of the build
+// (13.10: parts past the step played with no row to switch them off). The next step
+// of the build goes back to the lesson.
+let allRows = false
 function drawParts() {
   partsEl.innerHTML = ''
+  const full = stage >= PARTS.length
   PARTS.forEach((p, idx) => {
-    if (idx > stage) return                                   // the build shows what's in, plus the next part
+    if (!full && !allRows && idx > stage) return              // the build shows what's in, plus the next part
+    const next = !full && !allRows && idx === stage
     const row = document.createElement('div')
-    row.className = `part${idx === stage ? ' part--next' : p.on ? '' : ' part--off'}${p.fresh ? ' part--new' : ''}`
+    row.className = `part${next ? ' part--next' : p.on ? '' : ' part--off'}${p.fresh ? ' part--new' : ''}`
     row.innerHTML = `<i style="background:${COLORS[p.group]}"></i><div class="part__n">${midName(p)}<small>${tags(p)}</small></div>
-      <button title="Mute / unmute">${p.on ? '◉' : '○'}</button><button title="Swap for a random ${p.group.toLowerCase()} from the library">🎲</button>`
+      <button title="Mute / unmute">${p.on ? '◉' : '○'}</button><button class="dice" title="Swap for a random ${p.group.toLowerCase()} from the library"${full ? '' : ' style="visibility:hidden" tabindex="-1"'}>🎲</button>`
     const [mute, dice] = row.querySelectorAll('button')
     mute.onclick = () => { p.on = !p.on; if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02); drawParts(); recompute(); drawHandle(); if (stage >= PARTS.length) drawIdeas() }
     dice.onclick = () => swap(p)
@@ -508,7 +451,7 @@ const msg = (t, mud = false) => { $('msg').textContent = t; $('msg').classList.t
 
 // ---------- the build ----------
 const STAGE0 = 'Build a midee track from nothing, one part at a time. Watch the four glasses fill up and the floor wake up.'
-const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, change the key, catch the mixes you like as ideas, and take it all as your first Ableton project.'
+const FINAL = 'That is a full track. Every glass is filled and nothing fights in LOW. Now make it yours: roll the dice, catch the mixes you like as ideas, and take it all as your first Ableton project.'
 // On a phone the deck is folded. When the last part is in, it opens by itself
 // and the dice light up: this is where the track becomes yours. Once.
 let revealed = false
@@ -527,14 +470,14 @@ const TIPS = {
 let tipStep = null
 // the dice: the first one in view, not one hidden under the deck's sticky handle on a phone
 function firstDice() {
-  const all = [...partsEl.querySelectorAll('.part button:last-child')].filter((b) => b.offsetParent)
+  const all = [...partsEl.querySelectorAll('.part .dice')].filter((b) => b.offsetParent && b.style.visibility !== 'hidden')
   const h = $('handle'), top = h && h.offsetParent ? h.getBoundingClientRect().bottom : $('deck').getBoundingClientRect().top
   return all.find((b) => b.getBoundingClientRect().top >= top - 2) || all[0]
 }
 const tipTarget = () => tipStep === 'dice' ? firstDice() : tipStep && $(tipStep)
 function lightTip() {
   document.querySelectorAll('.hint--on').forEach((b) => b.classList.remove('hint--on'))
-  if (tipStep === 'dice') partsEl.querySelectorAll('.part button:last-child').forEach((b) => b.classList.add('hint--on'))
+  if (tipStep === 'dice') partsEl.querySelectorAll('.part .dice').forEach((b) => b.classList.add('hint--on'))
   else if (tipStep) $(tipStep).classList.add('hint--on')
 }
 function placeTip() {
@@ -590,13 +533,15 @@ function revealEnd() {
   setTimeout(() => { hintCatch(); toDeckEnd() }, 500)
   setTimeout(() => deck.classList.remove('deck--reveal'), 900)
 }
-async function goTo(n) {
+async function goTo(n, keep = false) {
   if (!playing) { await ctx.resume(); const when = ahead(); startAt = when; playing = true; PARTS.forEach((p) => startPart(p, when)) }
   else if (ctx.state !== 'running') { userPaused = false; await ctx.resume() }
   drawPlay()
   stage = Math.max(0, Math.min(PARTS.length, n))
   if (stage > maxStage) { maxStage = stage; track('step', stage); if (stage === PARTS.length) track('full') }
+  if (!keep) allRows = false
   PARTS.forEach((p, i) => {
+    if (keep) return
     const was = p.on; p.on = i < stage
     if (p.on && !was && i === stage - 1) p.fresh = true
     p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02)
@@ -620,8 +565,6 @@ function drawStage() {
   $('catchbox').hidden = !(done || (wide && stage > 0))
   if (done) $('tools').firstElementChild.after($('catchbox'))
   else $('steps').after($('catchbox'))
-  // The key can change at any step; it stays locked only where the browser has no OGG.
-  keySel.disabled = mp4Only; drawKey()
   const focus = stage > 0 && !done ? LESSONS[stage - 1].zone : -1
   ZONES.forEach((z, i) => z.el.classList.toggle('z--focus', i === focus))
 }
@@ -638,16 +581,22 @@ function drawHandle() {
 $('next').onclick = () => goTo(stage + 1)
 $('back').onclick = () => goTo(stage - 1)
 $('back2').onclick = () => goTo(stage - 1)
-$('skip').onclick = () => { track('skip', stage); goTo(PARTS.length) }
+$('skip').onclick = () => { track('skip', stage); goTo(PARTS.length, !!activeIdea) }
 
 // Random: a part of the same kind from the whole library, at 128 BPM, in the key of the track.
 // The pool: ~950 library tracks across the groups, picked from the public
 // library list (pool.json), so the page also works away from midee.me.
+// 13.10 (Julie): sounds from different keys never play together. A sound has a key
+// when the library marks it tonal, or when its name says one (an FX, a vocal or a
+// percussion part can be keyed too). Bass and Synth must be in Amber's key; any other
+// part is either keyless or in that same key.
 let POOL = null
+const KEY_RE = /_([A-G]#?m?)_/
+const keyOf = (t) => t.tonal ? t.native : KEY_RE.test(t.name || '') ? (KEYS.indexOf(KEY_RE.exec(t.name)[1]) + 1 || -1) : 0
+const fitsKey = (t) => (t.group === 'Bass' || t.group === 'Synth') ? !!t.tonal && t.native === key : [0, key].includes(keyOf(t))
 async function pick(group, exclude) {
   POOL ??= (await (await fetch('pool.json')).json()).groups
-  const melodic = group === 'Bass' || group === 'Synth'
-  const ok = (POOL[group] || []).filter((t) => !exclude.has(t.id) && (!melodic || t.tonal) && (!mp4Only || !melodic || t.native === key))
+  const ok = (POOL[group] || []).filter((t) => !exclude.has(t.id) && fitsKey({ ...t, group }))
   return ok[Math.floor(Math.random() * ok.length)]
 }
 let busy = false
@@ -666,29 +615,6 @@ async function swap(p) {
     msg(`${midName(p)} is in${p.tonal ? `, played in ${KEYS[key - 1]}` : ''}.`)
     tipDone('dice')
   } catch (e) { msg(`Could not swap: ${e.message}`) }
-  busy = false
-}
-keySel.onchange = async () => {
-  if (mp4Only) { keySel.value = key; drawKey(); return }
-  const was = key
-  key = Number(keySel.value); drawKey(); track('key', KEYS[key - 1]); busy = true; msg(`Moving every melodic part to ${KEYS[key - 1]}…`)
-  try {
-    if (key !== was && !(await oggReady)) throw new Error('this browser plays the parts in their own key only')
-    await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
-    if (playing) { const when = ahead(); PARTS.filter((p) => p.tonal).forEach((p) => startPart(p, when)) }
-    drawParts(); recompute(); drawIdeas(); msg(`Now in ${KEYS[key - 1]}. Drums stay as they are, everything with notes moved.`)
-  } catch (e) {
-    msg(`Could not change key: ${e.message}`)
-    // a browser without OGG stays in the track's own key, with every part back on its own render
-    if (mp4Only && key !== was) {
-      key = was; keySel.value = String(key); drawKey()
-      try {
-        await Promise.all(PARTS.filter((p) => p.tonal).map(loadPart))
-        if (playing) { const when = ahead(); PARTS.filter((p) => p.tonal).forEach((p) => startPart(p, when)) }
-        drawParts(); recompute(); drawIdeas()
-      } catch {}
-    }
-  }
   busy = false
 }
 // Play / pause. On a phone the sound also stops by itself: the lock screen,
@@ -724,7 +650,12 @@ addEventListener('pointerdown', (e) => {
 // scene, like scenes in a midee project. Tap a scene to go back to it. In the
 // live version each idea becomes a scene of the person's midee project.
 const STORE = 'midee-club-ideas-v1'
-const IDEAS = (() => { try { return JSON.parse(localStorage.getItem(STORE)) || [] } catch { return [] } })()
+// Ideas saved before 13.10 in another key, or with a part moved off its own key,
+// can't play from the renders any more, and a keyed part from another key would
+// clash: only ideas whose every part fits Amber's key are kept.
+const IDEAS = (() => { try { return (JSON.parse(localStorage.getItem(STORE)) || [])
+  .filter((d) => d.key === key && d.parts.every(fitsKey))
+  .map((d, i) => ({ ...d, n: i + 1 })) } catch { return [] } })()
 const saveIdeas = () => { try { localStorage.setItem(STORE, JSON.stringify(IDEAS.map(({ n, key, parts }) => ({ n, key, parts: parts.map(({ id, name, group, tonal, native, on }) => ({ id, name, group, tonal, native, on })) })))) } catch {} }
 let activeIdea = null
 const sameAsNow = (idea) => idea.key === key && idea.parts.every((s, i) => s.id === PARTS[i].id && s.on === PARTS[i].on)
@@ -739,8 +670,6 @@ function catchIdea(quiet = false) {
 }
 async function recallIdea(idea) {
   if (busy) return
-  const keyChanged = idea.key !== key
-  key = idea.key; keySel.value = String(key); drawKey()
   // An idea saved in an earlier visit has no sound loaded yet.
   const missing = idea.parts.filter((s) => !s.buffer)
   if (missing.length) {
@@ -750,12 +679,12 @@ async function recallIdea(idea) {
   }
   const when = ahead()
   idea.parts.forEach((s, i) => {
-    const p = PARTS[i], changed = p.id !== s.id || (s.tonal && keyChanged)
+    const p = PARTS[i], changed = p.id !== s.id
     Object.assign(p, s)
     if (p.gain) p.gain.gain.setTargetAtTime(p.on ? 1 : 0, ctx.currentTime, 0.02)
     if (changed && playing) startPart(p, when)
   })
-  activeIdea = idea
+  activeIdea = idea; allRows = true
   drawParts(); recompute(); drawHandle(); drawIdeas(); msg(`Back to Idea ${idea.n}.`)
 }
 function drawIdeas() {
