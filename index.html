@@ -126,6 +126,18 @@
                box-shadow: 0 0 0 6px rgba(253,224,71,.22), 0 0 18px rgba(253,224,71,.6); }
   .gest__dot--trail { width: 16px; height: 16px; margin: -8px 0 0 -8px; box-shadow: none; }
   .gest__track { position: absolute; left: 0; top: 0; width: 38px; margin-left: -19px; border: 2px solid rgba(253,224,71,.8); border-radius: 19px; background: rgba(0,0,0,.45); }
+  /* 14.10: the tap — the dot presses and a ring spreads from where it pressed */
+  .gest__ring { position: absolute; left: 0; top: 0; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; border: 1.5px solid #fde047; opacity: 0;
+                box-shadow: 0 0 0 .5px rgba(0,0,0,.6); }
+  /* 14.10 (Julie): the tapping dot is a third smaller and see-through, so the speaker under it stays visible;
+     a glass is filled with the same yellow, so the dot keeps a thin dark rim */
+  .gest[data-mode="tap"] .gest__dot:not(.gest__dot--trail) { width: 17px; height: 17px; margin: -8.5px 0 0 -8.5px; opacity: .65;
+                box-shadow: 0 0 0 1.5px rgba(0,0,0,.7), 0 0 0 5px rgba(253,224,71,.2), 0 0 12px rgba(253,224,71,.4); }
+  .gest[data-mode="tap"] .gest__dot--trail { width: 10px; height: 10px; margin: -5px 0 0 -5px; }
+  .turn__p { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #fde047; vertical-align: 1px; animation: zoom 1.6s ease-in-out infinite; }
+  /* until the first tap on a speaker or a glass, the glasses breathe yellow to say they can be tapped */
+  body.tap-me .z__glass { animation: tapme 1.6s ease-in-out infinite; }
+  @keyframes tapme { 50% { border-color: rgba(253,224,71,.85); box-shadow: 0 0 0 3px rgba(253,224,71,.16), 0 0 18px rgba(253,224,71,.22); } }
   .turn--out { opacity: 0; }
   .turn--band { border-color: #fde047; color: #fde047; pointer-events: auto; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
   .turn--band[hidden] { display: none; }
@@ -319,12 +331,32 @@ const LESSONS = [
 let stage = 0
 // ================= counters =================
 // Aggregate counts on the bot server: the event, an optional value and the
-// link's utm_source. No id, no cookie. A failed count never blocks the page.
+// link's utm_source. A failed count never blocks the page.
+// 14.10 (Julie): every event also carries an anonymous visit id and the kind of device, so the
+// server can keep each visit's path. The id is random, kept in this browser's localStorage and
+// nowhere else; the device is a word like phone-ios. No IP, no User-Agent string, no Telegram id.
 const CLUB_API = 'https://bot.midee.me/club'
 const SRC = (new URLSearchParams(location.search).get('utm_source') || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24)
+const VID = (() => {
+  const fresh = Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) => b.toString(36).padStart(2, '0')).join('')
+  try {
+    const kept = localStorage.getItem('midee-club-vid')
+    if (/^[a-z0-9]{12,32}$/.test(kept || '')) return kept
+    localStorage.setItem('midee-club-vid', fresh)
+  } catch {}
+  return fresh
+})()
+const DEV = (() => {
+  const ua = navigator.userAgent, pf = navigator.userAgentData?.platform || navigator.platform || ''
+  const ipad = /iPad/.test(ua) || (/mac/i.test(pf) && navigator.maxTouchPoints > 1)
+  const os = /iPhone|iPod/.test(ua) || ipad ? 'ios' : /Android/.test(ua) ? 'android' : /mac/i.test(pf) ? 'mac'
+    : /win/i.test(pf) ? 'windows' : /linux/i.test(pf) ? 'linux' : 'other'
+  const kind = ipad || (/Android/.test(ua) && !/Mobile/.test(ua)) ? 'tablet' : /Mobi|iPhone|Android/.test(ua) ? 'phone' : 'desktop'
+  return `${kind}-${os}`
+})()
 function track(e, v) {
   try {
-    const body = JSON.stringify({ e, ...(v !== undefined && { v: String(v).toLowerCase().slice(0, 20) }), ...(SRC && { src: SRC }) })
+    const body = JSON.stringify({ e, ...(v !== undefined && { v: String(v).toLowerCase().slice(0, 20) }), ...(SRC && { src: SRC }), vid: VID, dev: DEV })
     if (!navigator.sendBeacon?.(`${CLUB_API}/event`, new Blob([body], { type: 'text/plain' })))
       fetch(`${CLUB_API}/event`, { method: 'POST', body, keepalive: true, headers: { 'Content-Type': 'text/plain' } }).catch(() => {})
   } catch {}
@@ -1037,8 +1069,12 @@ frameCamera()
 // to turn the room. Each hint replaces the last in the same place at the top. Any touch, drag or
 // scroll takes over. Afterwards the person can zoom out as far as the intro started.
 let intro = null, turned = false
-// timed in bars of the track (1.875 s at 128 BPM): fly-in 1 bar, zoom 1 bar, swing 2 bars
-const AXIS_Y = new THREE.Vector3(0, 1, 0), FLY = BAR, ZOOM = BAR, SWING = 2 * BAR
+// timed in bars of the track (1.875 s at 128 BPM): fly-in 1 bar, zoom 1 bar, swing 2 bars, then
+// 14.10: a tap on a sub (1 bar) and a tap on a glass (1 bar)
+const AXIS_Y = new THREE.Vector3(0, 1, 0), FLY = BAR, ZOOM = BAR, SWING = 2 * BAR, TAP = 2 * BAR
+// until the person taps a speaker or a glass for the first time, the subs and glasses breathe yellow
+let tapped = false, tapMe = false
+try { tapped = localStorage.getItem('midee-club-tapped') === '1' } catch {}
 // ?introAt=2.5 holds the intro at that second, for screenshots
 const INTRO_AT = new URLSearchParams(location.search).get('introAt')
 // the fly-in moves at once and slows into place; the zoom eases both ways
@@ -1048,7 +1084,8 @@ const easeInOut = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) /
 const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 || new URLSearchParams(location.search).has('touch')
 const HINTS = {
   zoom: () => `<span class="turn__z">±</span>${TOUCH ? 'Pinch to zoom' : 'Scroll to zoom in and out'}`,
-  turn: () => '<span class="turn__i">↻</span>Drag to turn the room · tap a speaker or a glass',
+  turn: () => '<span class="turn__i">↻</span>Drag to turn the room',
+  tap: () => `<span class="turn__p"></span>${TOUCH ? 'Tap' : 'Click'} a speaker or a glass to hear what it does`,
 }
 function showHint(kind) {
   const el = $('turn')
@@ -1058,11 +1095,11 @@ function showHint(kind) {
 // the touch points: a bright dot where the finger is and a fading trail of where it has just been
 const TRAIL = 6
 let gestMode = null, gestPast = []
-function drawGest(mode, points, track) {
+function drawGest(mode, points, track, ring) {
   const el = $('gest')
   if (mode !== gestMode) {
-    gestMode = mode; gestPast = points.map(() => [])
-    el.innerHTML = (track ? '<div class="gest__track"></div>' : '') + points.map(() =>
+    gestMode = mode; gestPast = points.map(() => []); el.dataset.mode = mode
+    el.innerHTML = (track ? '<div class="gest__track"></div>' : '') + (ring ? '<div class="gest__ring"></div>' : '') + points.map(() =>
       Array.from({ length: TRAIL }, () => '<div class="gest__dot gest__dot--trail"></div>').join('') + '<div class="gest__dot"></div>').join('')
   }
   el.hidden = false
@@ -1074,8 +1111,9 @@ function drawGest(mode, points, track) {
       const q = past[Math.min(past.length - 1, (k + 1) * 3)], d = dots[i * (TRAIL + 1) + k]
       d.style.transform = `translate(${q.x}px, ${q.y}px)`; d.style.opacity = (0.45 * (1 - k / TRAIL)).toFixed(2)
     }
-    dots[i * (TRAIL + 1) + TRAIL].style.transform = `translate(${p.x}px, ${p.y}px)`
+    dots[i * (TRAIL + 1) + TRAIL].style.transform = `translate(${p.x}px, ${p.y}px) scale(${p.s ?? 1})`
   })
+  if (ring) { const r = el.querySelector('.gest__ring'); r.style.transform = `translate(${ring.x}px, ${ring.y}px) scale(${ring.s})`; r.style.opacity = ring.o.toFixed(2) }
 }
 function hideGest() { $('gest').hidden = true; gestMode = null }
 // where the gesture is drawn: a little below the middle of the room as it stands on screen
@@ -1089,10 +1127,17 @@ function startIntro() {
   // a phone already stands further back, so it needs less distance to show the whole room
   const narrow = innerWidth < 900, far = base.clone().multiplyScalar(narrow ? 2.2 : 3.2); far.y += narrow ? 8 : 14
   controls.maxDistance = Math.max(controls.maxDistance, far.length() + 1)   // and the person can go there too
-  intro = { t0: performance.now(), base, far }
+  intro = { t0: performance.now(), base, far, ty: controls.target.y }
   showHint('zoom'); stepIntro()
 }
-function endIntro() { intro = null; hideGest() }
+function endIntro() { intro = null; hideGest(); setTapMe(!tapped) }
+function setTapMe(on) { tapMe = on; document.body.classList.toggle('tap-me', on) }
+// the person tapped a speaker or a glass: they know now, so the breathing stops for good
+function markTapped() {
+  if (tapped) return
+  tapped = true; setTapMe(false)
+  try { localStorage.setItem('midee-club-tapped', '1') } catch {}
+}
 function turnOff() { turned = true; endIntro(); $('turn').hidden = true }
 function hideTurn() { $('turn').classList.add('turn--out'); setTimeout(() => { $('turn').hidden = true }, 700) }
 function stepIntro() {
@@ -1110,13 +1155,61 @@ function stepIntro() {
     return
   }
   const s = z - ZOOM
+  if (s >= SWING) { at(intro.base); tapDemo(s - SWING); return }
   showHint('turn')
-  if (s >= SWING) { at(intro.base); endIntro(); setTimeout(hideTurn, 2000); return }
   const ease = Math.sin(Math.PI * s / SWING)                   // starts and ends still
   const a = 0.42 * ease * Math.sin(2 * Math.PI * s / SWING)
   at(intro.base.clone().applyAxisAngle(AXIS_Y, a))
   // dragging right turns the camera the other way round the room, so the point moves against the angle
   drawGest('drag', [{ x: c.x - 110 * a / 0.42, y: c.y }])
+}
+// 14.10 (Julie): after the swing the dot taps a sub, then a hanging top (computer only), then the LOW
+// glass, so it is clear they can be tapped. It is only a picture: nothing opens and the sound stays.
+const onScreen = (v3) => { const v = v3.clone().project(camera); return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight } }
+// a point the person can actually see: inside the window and not under the glasses, the deck or a card
+const seen = (p) => p.x > 12 && p.x < innerWidth - 12 && p.y > 60 && p.y < innerHeight - 30 && document.elementFromPoint(p.x, p.y) === renderer.domElement
+// of these speakers, the visible one nearest the middle of the room
+function pickOnScreen(list) {
+  const c = gestCentre(), ok = list.map((s) => onScreen(s.glow.position)).filter(seen)
+    .sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))
+  return ok[0] || onScreen(list[0].glow.position)
+}
+function glassOnScreen() {
+  const r = ZONES[0].el.querySelector('.z__glass').getBoundingClientRect()
+  return { x: r.left + r.width / 2, y: r.top + r.height * 0.22 }   // the empty top of the glass, where the dot shows
+}
+// the camera turned round the room by angle a, looking lift units higher, from where the intro left it
+function pose(a, lift = 0) {
+  controls.target.y = intro.ty + lift
+  camera.position.copy(controls.target).add(intro.base.clone().applyAxisAngle(AXIS_Y, a)); camera.lookAt(controls.target); camera.updateMatrixWorld()
+}
+// On a phone the subs stand at the very edge of the screen. While the dot travels to the sub, the
+// room turns a little until the inner left sub stands whole, about a fifth in from the left edge.
+// 14.10 (Julie): the phone taps only the sub and the glass. The tops hang behind the glasses there,
+// and reaching them took a 40° turn and a lifted view; the tops still breathe until the first tap.
+function aimPhone(sub) {
+  let best = { a: 0, lift: 0, e: Infinity }
+  for (let a = -0.8; a <= 0.8; a += 0.01) { pose(a); const e = Math.abs(onScreen(sub.glow.position).x - innerWidth * 0.22); if (e < best.e) best = { a, lift: 0, e } }
+  pose(0); return best
+}
+function tapDemo(u) {
+  // the room stays turned toward the speakers at the end, so nothing jumps
+  if (u >= TAP) { if (intro.aim) pose(intro.aim.a, intro.aim.lift); endIntro(); setTimeout(hideTurn, 2000); return }
+  showHint('tap')
+  if (!intro.taps) {
+    if (innerWidth < 900) {
+      const sub = subs.find((s) => s.x === -6.6 && s.glow.position.y > 1)
+      intro.aim = aimPhone(sub); pose(intro.aim.a, intro.aim.lift)
+      intro.taps = [onScreen(sub.glow.position), glassOnScreen()]
+    } else intro.taps = [pickOnScreen(subs), pickOnScreen(tops), glassOnScreen()]
+  }
+  // the taps share two bars (three on a computer, two on a phone): travel to the target, press,
+  // and a ring spreads from the press
+  const n = intro.taps.length, SEG = TAP / n, k = Math.min(n - 1, Math.floor(u / SEG)), v = (u - k * SEG) / SEG, to = intro.taps[k], from = k ? intro.taps[k - 1] : gestCentre()
+  if (intro.aim) { const w = k ? 1 : easeInOut(Math.min(1, v / 0.4)); pose(intro.aim.a * w, intro.aim.lift * w) }
+  const m = easeInOut(Math.min(1, v / 0.4)), r = v < 0.45 ? 0 : (v - 0.45) / 0.55
+  drawGest('tap', [{ x: from.x + (to.x - from.x) * m, y: from.y + (to.y - from.y) * m, s: v > 0.4 && v < 0.56 ? 0.7 : 1 }], null,
+    { x: to.x, y: to.y, s: 1 + 2.4 * r, o: r ? 0.7 * (1 - r) : 0 })
 }
 const takeOver = () => { if (!turned) { turned = true; endIntro(); hideTurn(); track('turn') } }
 renderer.domElement.addEventListener('pointerdown', takeOver)
@@ -1171,7 +1264,7 @@ const W = 40, D = 26, H = 12, BOOTH_Z = -D / 2 + 3
 }
 
 // the club system
-const SUBC = new THREE.Color('#a78bfa'), TOPC = new THREE.Color('#5eead4'), MUDC = new THREE.Color('#7c6f5e')
+const TAPC = new THREE.Color('#fde047'), SUBC = new THREE.Color('#a78bfa'), TOPC = new THREE.Color('#5eead4'), MUDC = new THREE.Color('#7c6f5e')
 const subs = [], tops = []
 for (const x of [-9, -6.6, 6.6, 9]) for (let k = 0; k < 2; k++) {
   const geo = new THREE.BoxGeometry(1.8, 1, 1.2)
@@ -1185,7 +1278,7 @@ for (const [x, y, z] of [[-10.5, 7.2, BOOTH_Z + 1.2], [10.5, 7.2, BOOTH_Z + 1.2]
   const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), lineMat(TOPC, 0.9))
   const glow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: TOPC, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false }))
   for (const m of [edge, glow]) { m.position.set(x, y - k * 0.4, z + k * 0.04); m.rotation.x = k * 0.06; scene.add(m) }
-  tops.push({ glow })
+  tops.push({ glow, edge })
 }
 
 // ---------- tap a speaker ----------
@@ -1254,7 +1347,7 @@ $('spkSolo').onclick = () => { const k = SPEAKERS[spkKind]; if (!k) return; solo
 function openSpk(kind) {
   if (spkKind === kind) { closeSpk(); return }
   if (spkKind) closeSpk()
-  spkKind = kind; track('card', kind)
+  spkKind = kind; track('card', kind); markTapped()
   if (kind[0] === 'z') soloOn(kind)
   else turnOff()
   drawSpk()
@@ -1367,12 +1460,18 @@ function tick() {
   if (mix && st >= 0) { const m = mix.live[st % 128]; low = m[0] / REF; hi = (m[1] + m[2] + m[3]) / REF }
   drawLasers(beat, running ? Math.min(1, low) : 0.2)
   const subCol = SUBC.clone().lerp(MUDC, mud ? 1 : 0)
+  // until the first tap on a speaker or a glass, the subs and the tops breathe yellow with the glasses
+  const breath = tapMe ? 0.5 - 0.5 * Math.cos(now * 2 * Math.PI / 1.6) : 0
   for (const s of subs) {
     s.glow.material.color.copy(subCol); s.edge.material.color.copy(subCol)
+    if (tapMe) { s.edge.material.color.lerp(TAPC, breath); s.glow.material.color.lerp(TAPC, 0.8 * breath) }
     s.glow.material.opacity = 0.08 + 0.5 * Math.min(1, low)
     s.glow.scale.setScalar(1 + 0.05 * Math.min(1, low) + (mud ? 0.05 * Math.sin(now * 37 + s.x) : 0))
   }
-  for (const t of tops) t.glow.material.opacity = 0.06 + 0.7 * Math.min(1, hi)
+  for (const t of tops) {
+    t.glow.material.opacity = 0.06 + 0.7 * Math.min(1, hi)
+    t.glow.material.color.copy(TOPC).lerp(TAPC, 0.8 * breath); t.edge.material.color.copy(TOPC).lerp(TAPC, breath)
+  }
   drawGlasses(st)
   stepIntro(); controls.update(); renderer.render(scene, camera); requestAnimationFrame(tick)
 }
@@ -1390,9 +1489,9 @@ Promise.all(PARTS.map(loadPart)).then(() => {
   drawIdeas()
   msg('Amber: ten parts of one midee track, real previews from the library.')
 }).catch((e) => { $('next').textContent = 'Could not load'; $('enter').textContent = 'Could not load the club'; msg(e.message) })
-$('enter').onclick = () => { track('enter'); startIntro(); $('welcome').hidden = true; goTo(1) }
+$('enter').onclick = () => { track('enter'); $('welcome').hidden = true; startIntro(); goTo(1) }
 // ?audioTest opens the player to the console, to measure that the parts stay in step
-if (new URLSearchParams(location.search).has('audioTest')) window.__club = { ctx, PARTS, startPart, ramp, camera, controls, get intro() { return intro }, get startAt() { return startAt } }
+if (new URLSearchParams(location.search).has('audioTest')) window.__club = { ctx, PARTS, startPart, ramp, camera, controls, get intro() { return intro }, get tapMe() { return tapMe }, pickOnScreen, subs, tops, glassOnScreen, get startAt() { return startAt } }
 </script>
 </body>
 </html>
